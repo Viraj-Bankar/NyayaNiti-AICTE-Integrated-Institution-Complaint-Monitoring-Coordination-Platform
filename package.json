@@ -1,0 +1,12 @@
+{
+  "name": "nyayaniti",
+  "version": "1.0.0",
+  "description": "NyayaNiti — AICTE Integrated Institution Complaint Monitoring & Cross-Bureau Coordination Platform",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "frontend": "npm run dev --prefix frontend",
+    "backend": "npm run dev --prefix backend",
+    "build": "npm run build --prefix frontend",
+    "test": ".\\backend\\venv\\Scripts\\pytest backend/tests -v"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "nyayaniti-backend",
+  "version": "1.0.0",
+  "description": "NyayaNiti FastAPI Backend Service",
+  "scripts": {
+    "predev": "powershell -NoProfile -Command \"try { (Get-NetTCPConnection -LocalPort 8000 -ErrorAction Stop).OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } } catch {}; exit 0\"",
+    "dev": ".\\venv\\Scripts\\uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload",
+    "start": ".\\venv\\Scripts\\uvicorn app.main:app --host 127.0.0.1 --port 8000",
+    "test": ".\\venv\\Scripts\\pytest -v"
+  }
+}
