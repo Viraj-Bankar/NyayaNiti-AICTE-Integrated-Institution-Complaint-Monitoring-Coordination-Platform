@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
-import { DashboardKpis, AlertTickerItem } from '../types';
+import { api, API_BASE } from '../services/api';
+import { DashboardKpis } from '../types';
 import { AlertTicker } from '../components/common/AlertTicker';
 import { StatusBadge } from '../components/common/StatusBadge';
 import {
@@ -15,69 +15,16 @@ import {
   PieChart, Pie, Cell, AreaChart, Area, Legend
 } from 'recharts';
 
-const DEFAULT_CHARTS = {
-  bureau_workload: [
-    { bureau: 'RB', name: 'Regulation Bureau', total: 14, active: 9, disposed: 5 },
-    { bureau: 'PGRC', name: 'Public Grievance Redressal Cell', total: 11, active: 7, disposed: 4 },
-    { bureau: 'AB', name: 'Approval Bureau', total: 5, active: 3, disposed: 2 }
-  ],
-  status_distribution: [
-    { status: 'Pending', count: 6 },
-    { status: 'Under Process', count: 10 },
-    { status: 'Escalated', count: 3 },
-    { status: 'Disposed', count: 8 },
-    { status: 'Transferred', count: 3 }
-  ],
-  priority_distribution: [
-    { priority: 'Critical', count: 4 },
-    { priority: 'High', count: 9 },
-    { priority: 'Medium', count: 12 },
-    { priority: 'Low', count: 5 }
-  ],
-  overlap_status: [
-    { status: 'New', count: 4 },
-    { status: 'Under Review', count: 3 },
-    { status: 'Coordinated', count: 5 },
-    { status: 'Proceeded Separately', count: 2 }
-  ],
-  case_ageing: [
-    { bracket: '< 15 Days', cases: 8 },
-    { bracket: '15 - 30 Days', cases: 6 },
-    { bracket: '31 - 60 Days', cases: 3 },
-    { bracket: '> 60 Days', cases: 2 }
-  ],
-  monthly_trend: [
-    { month: 'May 2026', received: 12, disposed: 9 },
-    { month: 'Jun 2026', received: 15, disposed: 11 },
-    { month: 'Jul 2026', received: 18, disposed: 14 },
-    { month: 'Aug 2026', received: 22, disposed: 17 },
-    { month: 'Sep 2026', received: 19, disposed: 16 },
-    { month: 'Oct 2026', received: 25, disposed: 18 }
-  ],
-  coordination_outcomes: [
-    { outcome: 'Joint Inquiry', count: 4 },
-    { outcome: 'Single Bureau Lead', count: 5 },
-    { outcome: 'Case Consolidated', count: 3 },
-    { outcome: 'Independent Parallel', count: 2 }
-  ],
-  category_distribution: [
-    { category: 'Faculty Shortage', count: 7 },
-    { category: 'Fee Overcharging', count: 6 },
-    { category: 'Unapproved Infrastructure', count: 5 },
-    { category: 'Admission Irregularity', count: 4 },
-    { category: 'Certificate Withholding', count: 3 }
-  ]
-};
-
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [kpis, setKpis] = useState<DashboardKpis | null>(null);
-  const [charts, setCharts] = useState<any>(DEFAULT_CHARTS);
+  const [charts, setCharts] = useState<any | null>(null);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
 
@@ -87,6 +34,7 @@ export const DashboardPage: React.FC = () => {
 
   const loadDashboardData = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const [kpisRes, chartsRes, activityRes, deadlinesRes] = await Promise.all([
         api.getKpis(),
@@ -94,12 +42,13 @@ export const DashboardPage: React.FC = () => {
         api.getRecentActivity(),
         api.getUpcomingDeadlines()
       ]);
-      if (kpisRes) setKpis(kpisRes);
-      if (chartsRes) setCharts(chartsRes);
-      if (activityRes) setRecentActivity(activityRes);
-      if (deadlinesRes) setUpcomingDeadlines(deadlinesRes);
-    } catch (err) {
-      console.warn('Dashboard loading with offline fallback:', err);
+      setKpis(kpisRes);
+      setCharts(chartsRes);
+      setRecentActivity(activityRes || []);
+      setUpcomingDeadlines(deadlinesRes || []);
+    } catch (err: any) {
+      console.error('Dashboard data fetching error:', err);
+      setError(err?.message || 'Failed to connect to the backend server. Please verify network connectivity.');
     } finally {
       setIsLoading(false);
     }
@@ -121,9 +70,19 @@ export const DashboardPage: React.FC = () => {
 
   const COLORS = ['#092D62', '#1E5AA8', '#25B8BD', '#FFB900', '#C62828', '#218653'];
 
+  const renderKpiValue = (val: number | undefined) => {
+    if (isLoading && kpis === null) {
+      return <span className="inline-block w-8 h-6 bg-slate-200 animate-pulse rounded" />;
+    }
+    if (error && kpis === null) {
+      return <span className="text-red-500 font-mono text-base">--</span>;
+    }
+    return val ?? 0;
+  };
+
   return (
     <div className="min-h-screen bg-[#F4F6F9] pb-12">
-      {/* 1. Feature 3: Sliding Alert Ticker */}
+      {/* 1. Sliding Alert Ticker */}
       <AlertTicker />
 
       <div className="max-w-7xl mx-auto px-4 pt-6 space-y-6">
@@ -143,8 +102,8 @@ export const DashboardPage: React.FC = () => {
               <span>Institution Complaint Monitoring & Coordination Dashboard</span>
             </h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              Active Officer: <strong className="text-[#092D62]">{user?.full_name || 'Dr. Rajesh Sharma'}</strong> |
-              Role: <strong className="text-[#092D62]">{user?.role?.replace('_', ' ').toUpperCase() || 'SUPER ADMIN'}</strong> |
+              Active Officer: <strong className="text-[#092D62]">{user?.full_name || 'Dr. Rajesh Sharma'}</strong> |{' '}
+              Role: <strong className="text-[#092D62]">{user?.role?.replace('_', ' ').toUpperCase() || 'SUPER ADMIN'}</strong> |{' '}
               Bureau: <strong className="text-[#092D62]">{user?.bureau_code || 'Regulation Bureau (RB)'}</strong>
             </p>
           </div>
@@ -169,6 +128,16 @@ export const DashboardPage: React.FC = () => {
               <span>{isScanning ? 'Scanning...' : 'Run AI Scan'}</span>
             </button>
 
+            <button
+              onClick={loadDashboardData}
+              disabled={isLoading}
+              className="btn-3d-white px-3.5 py-2 rounded text-xs tracking-wide font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              title="Refresh live metrics from Neon PostgreSQL"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#092D62] ${isLoading ? 'animate-spin' : ''}`} />
+              <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
+            </button>
+
             <a
               href={api.getExportCsvUrl()}
               className="btn-3d-white px-3.5 py-2 rounded text-xs tracking-wide font-semibold flex items-center gap-1.5 cursor-pointer"
@@ -179,6 +148,34 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Backend Connection Error Banner */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-[#C62828] p-4 rounded-r-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-[#C62828] flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wide">
+                  Backend Service Unavailable
+                </h4>
+                <p className="text-xs text-slate-700 mt-0.5">
+                  {error}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5 font-mono">
+                  Target API: {API_BASE}/dashboard/kpis
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={loadDashboardData}
+              disabled={isLoading}
+              className="btn-3d-navy px-4 py-1.5 rounded text-xs tracking-wide flex items-center gap-1.5 cursor-pointer self-start sm:self-auto disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Retry Connection</span>
+            </button>
+          </div>
+        )}
+
         {scanMessage && (
           <div className="bg-amber-50 border border-amber-300 text-amber-900 px-4 py-2 rounded text-xs font-semibold flex items-center justify-between">
             <span>{scanMessage}</span>
@@ -186,7 +183,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         )}
 
-        {/* 2. Feature 2: 8 High-Impact KPI Cards (Database-Derived) */}
+        {/* 2. 8 High-Impact KPI Cards (Live Neon Database) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {/* Card 1: Total */}
           <div
@@ -194,8 +191,8 @@ export const DashboardPage: React.FC = () => {
             className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-[#092D62] transition-all cursor-pointer group"
           >
             <span className="text-[10px] uppercase font-bold text-slate-500">Total Cases</span>
-            <div className="text-xl font-black text-[#092D62] mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.total_complaints ?? 0}
+            <div className="text-xl font-black text-[#092D62] mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.total_complaints)}
             </div>
             <span className="text-[9px] text-slate-500 block mt-1">Registry-Wide</span>
           </div>
@@ -206,8 +203,8 @@ export const DashboardPage: React.FC = () => {
             className="bg-white rounded-lg p-3 border border-amber-200 shadow-sm hover:shadow-md hover:border-amber-400 transition-all cursor-pointer group"
           >
             <span className="text-[10px] uppercase font-bold text-amber-800">Pending</span>
-            <div className="text-xl font-black text-[#FFB900] mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.pending ?? 0}
+            <div className="text-xl font-black text-[#FFB900] mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.pending)}
             </div>
             <span className="text-[9px] text-amber-700 block mt-1">Initial Scrutiny</span>
           </div>
@@ -218,8 +215,8 @@ export const DashboardPage: React.FC = () => {
             className="bg-white rounded-lg p-3 border border-blue-200 shadow-sm hover:shadow-md hover:border-blue-400 transition-all cursor-pointer group"
           >
             <span className="text-[10px] uppercase font-bold text-[#1E5AA8]">Under Process</span>
-            <div className="text-xl font-black text-[#1E5AA8] mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.under_process ?? 0}
+            <div className="text-xl font-black text-[#1E5AA8] mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.under_process)}
             </div>
             <span className="text-[9px] text-slate-500 block mt-1">Active Inquiry</span>
           </div>
@@ -230,8 +227,8 @@ export const DashboardPage: React.FC = () => {
             className="bg-white rounded-lg p-3 border border-emerald-200 shadow-sm hover:shadow-md hover:border-emerald-400 transition-all cursor-pointer group"
           >
             <span className="text-[10px] uppercase font-bold text-[#218653]">Disposed</span>
-            <div className="text-xl font-black text-[#218653] mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.disposed ?? 0}
+            <div className="text-xl font-black text-[#218653] mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.disposed)}
             </div>
             <span className="text-[9px] text-emerald-700 block mt-1">Complied / Closed</span>
           </div>
@@ -242,8 +239,8 @@ export const DashboardPage: React.FC = () => {
             className="bg-white rounded-lg p-3 border border-purple-200 shadow-sm hover:shadow-md hover:border-purple-400 transition-all cursor-pointer group"
           >
             <span className="text-[10px] uppercase font-bold text-purple-800">Transferred</span>
-            <div className="text-xl font-black text-purple-700 mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.transferred ?? 0}
+            <div className="text-xl font-black text-purple-700 mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.transferred)}
             </div>
             <span className="text-[9px] text-purple-600 block mt-1">Inter-Bureau</span>
           </div>
@@ -257,8 +254,8 @@ export const DashboardPage: React.FC = () => {
               <Clock className="w-2.5 h-2.5" />
               Overdue
             </span>
-            <div className="text-xl font-black text-[#C62828] mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.overdue ?? 0}
+            <div className="text-xl font-black text-[#C62828] mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.overdue)}
             </div>
             <span className="text-[9px] text-red-700 block mt-1 font-semibold">SLA Breached</span>
           </div>
@@ -272,8 +269,8 @@ export const DashboardPage: React.FC = () => {
               <GitMerge className="w-2.5 h-2.5 text-amber-600" />
               Overlaps
             </span>
-            <div className="text-xl font-black text-amber-900 mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.potential_overlaps_awaiting_review ?? 0}
+            <div className="text-xl font-black text-amber-900 mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.potential_overlaps_awaiting_review)}
             </div>
             <span className="text-[9px] text-amber-800 block mt-1 font-semibold">Awaiting Review</span>
           </div>
@@ -287,24 +284,24 @@ export const DashboardPage: React.FC = () => {
               <AlertTriangle className="w-2.5 h-2.5 text-[#C62828]" />
               Conflicts
             </span>
-            <div className="text-xl font-black text-[#C62828] mt-1 group-hover:scale-105 transition-transform">
-              {kpis?.action_conflicts_awaiting_review ?? 0}
+            <div className="text-xl font-black text-[#C62828] mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.action_conflicts_awaiting_review)}
             </div>
             <span className="text-[9px] text-red-800 block mt-1 font-semibold">Reconcile Now</span>
           </div>
         </div>
 
-        {/* 3. Recharts Visual Analytics (8 Charts) */}
+        {/* 3. Recharts Visual Analytics (Live Backend Data) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Chart 1: Bureau Workload (Active vs Disposed) */}
           <div className="lg:col-span-6 bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
               <div>
                 <h4 className="text-xs font-bold text-[#061E46]">1. Bureau-Wise Case Workload</h4>
-                <p className="text-[10px] text-slate-500">Distribution across Regulation Bureau, PGRC, & Approvals</p>
+                <p className="text-[10px] text-slate-500">Live distribution across Regulation Bureau, PGRC, & Approvals</p>
               </div>
               <span className="text-[10px] font-mono text-[#092D62] font-semibold bg-slate-100 px-2 py-0.5 rounded">
-                Workload Ratio
+                Live Data
               </span>
             </div>
             <div className="h-60 w-full">
@@ -319,8 +316,15 @@ export const DashboardPage: React.FC = () => {
                     <Bar dataKey="disposed" name="Disposed / Closed" fill="#218653" />
                   </BarChart>
                 </ResponsiveContainer>
+              ) : isLoading ? (
+                <div className="h-full flex flex-col items-center justify-center text-xs text-slate-500 gap-2">
+                  <RefreshCw className="w-5 h-5 text-[#092D62] animate-spin" />
+                  <span>Loading bureau workload...</span>
+                </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-xs text-slate-400">Loading chart...</div>
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  {error ? 'Unable to load workload data' : 'No records found'}
+                </div>
               )}
             </div>
           </div>
@@ -330,18 +334,18 @@ export const DashboardPage: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
               <div>
                 <h4 className="text-xs font-bold text-[#061E46]">2. Complaint Status Distribution</h4>
-                <p className="text-[10px] text-slate-500">Proportion of cases across statutory resolution stages</p>
+                <p className="text-[10px] text-slate-500">Live proportions across statutory resolution stages</p>
               </div>
               <span className="text-[10px] font-mono text-[#092D62] font-semibold bg-slate-100 px-2 py-0.5 rounded">
-                Live Status
+                Live Data
               </span>
             </div>
             <div className="h-60 w-full flex items-center">
-              {charts?.status_distribution ? (
+              {charts?.status_distribution && charts.status_distribution.some((d: any) => d.count > 0) ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={charts.status_distribution}
+                      data={charts.status_distribution.filter((d: any) => d.count > 0)}
                       dataKey="count"
                       nameKey="status"
                       cx="50%"
@@ -358,8 +362,15 @@ export const DashboardPage: React.FC = () => {
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 4 }} />
                   </PieChart>
                 </ResponsiveContainer>
+              ) : isLoading ? (
+                <div className="h-full w-full flex flex-col items-center justify-center text-xs text-slate-500 gap-2">
+                  <RefreshCw className="w-5 h-5 text-[#092D62] animate-spin" />
+                  <span>Loading status distribution...</span>
+                </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-xs text-slate-400">Loading chart...</div>
+                <div className="h-full w-full flex items-center justify-center text-xs text-slate-400">
+                  {error ? 'Unable to load status distribution' : 'No status records found'}
+                </div>
               )}
             </div>
           </div>
@@ -369,7 +380,7 @@ export const DashboardPage: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-3">
               <div>
                 <h4 className="text-xs font-bold text-[#061E46]">3. Monthly Ingestion vs Disposal Trend</h4>
-                <p className="text-[10px] text-slate-500">Comparison of monthly complaint intake vs resolutions</p>
+                <p className="text-[10px] text-slate-500">Monthly complaint intake vs resolutions from database</p>
               </div>
               <span className="text-[10px] font-mono text-[#092D62] font-semibold bg-slate-100 px-2 py-0.5 rounded">
                 6-Month Trend
@@ -387,8 +398,15 @@ export const DashboardPage: React.FC = () => {
                     <Area type="monotone" dataKey="disposed" name="Disposed" stroke="#218653" fill="#218653" fillOpacity={0.2} />
                   </AreaChart>
                 </ResponsiveContainer>
+              ) : isLoading ? (
+                <div className="h-full flex flex-col items-center justify-center text-xs text-slate-500 gap-2">
+                  <RefreshCw className="w-5 h-5 text-[#092D62] animate-spin" />
+                  <span>Loading monthly trends...</span>
+                </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-xs text-slate-400">Loading chart...</div>
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  {error ? 'Unable to load trend data' : 'No trend records found'}
+                </div>
               )}
             </div>
           </div>
@@ -414,8 +432,15 @@ export const DashboardPage: React.FC = () => {
                     <Bar dataKey="cases" name="Active Cases" fill="#FFB900" />
                   </BarChart>
                 </ResponsiveContainer>
+              ) : isLoading ? (
+                <div className="h-full flex flex-col items-center justify-center text-xs text-slate-500 gap-2">
+                  <RefreshCw className="w-5 h-5 text-[#092D62] animate-spin" />
+                  <span>Loading case ageing data...</span>
+                </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-xs text-slate-400">Loading chart...</div>
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  {error ? 'Unable to load ageing data' : 'No records found'}
+                </div>
               )}
             </div>
           </div>
@@ -436,7 +461,11 @@ export const DashboardPage: React.FC = () => {
                     <Bar dataKey="count" fill="#C62828" />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : null}
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  {isLoading ? 'Loading...' : 'No priority data'}
+                </div>
+              )}
             </div>
           </div>
 
@@ -447,7 +476,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-[10px] text-slate-400">AI Matches</span>
             </div>
             <div className="h-52 w-full">
-              {charts?.overlap_status ? (
+              {charts?.overlap_status && charts.overlap_status.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -466,7 +495,11 @@ export const DashboardPage: React.FC = () => {
                     <Tooltip contentStyle={{ fontSize: 11 }} />
                   </PieChart>
                 </ResponsiveContainer>
-              ) : null}
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  {isLoading ? 'Loading...' : 'No overlap records'}
+                </div>
+              )}
             </div>
           </div>
 
@@ -486,7 +519,11 @@ export const DashboardPage: React.FC = () => {
                     <Bar dataKey="count" fill="#1E5AA8" />
                   </BarChart>
                 </ResponsiveContainer>
-              ) : null}
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  {isLoading ? 'Loading...' : 'No category data'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -510,47 +547,53 @@ export const DashboardPage: React.FC = () => {
               </div>
 
               <div className="space-y-2.5">
-                {upcomingDeadlines.map((dl) => (
-                  <div
-                    key={dl.id}
-                    onClick={() => navigate(`/cases/${dl.id}`)}
-                    className={`p-2.5 rounded border text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                      dl.is_overdue
-                        ? 'bg-red-50 border-red-200 hover:bg-red-100/70'
-                        : dl.days_remaining <= 3
-                        ? 'bg-amber-50 border-amber-200 hover:bg-amber-100/70'
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-[#092D62]">{dl.id}</span>
-                        <span className="text-[10px] bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded font-semibold">
-                          {dl.bureau_code}
-                        </span>
-                        <StatusBadge status={dl.priority} type="priority" />
+                {upcomingDeadlines.length > 0 ? (
+                  upcomingDeadlines.map((dl) => (
+                    <div
+                      key={dl.id}
+                      onClick={() => navigate(`/cases/${dl.id}`)}
+                      className={`p-2.5 rounded border text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                        dl.is_overdue
+                          ? 'bg-red-50 border-red-200 hover:bg-red-100/70'
+                          : dl.days_remaining <= 3
+                          ? 'bg-amber-50 border-amber-200 hover:bg-amber-100/70'
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[#092D62]">{dl.id}</span>
+                          <span className="text-[10px] bg-slate-200 text-slate-800 px-1.5 py-0.2 rounded font-semibold">
+                            {dl.bureau_code}
+                          </span>
+                          <StatusBadge status={dl.priority} type="priority" />
+                        </div>
+                        <p className="text-[11px] text-slate-700 truncate max-w-xs mt-0.5 font-medium">
+                          {dl.institution_name}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-700 truncate max-w-xs mt-0.5 font-medium">
-                        {dl.institution_name}
-                      </p>
-                    </div>
 
-                    <div className="text-right flex-shrink-0">
-                      {dl.is_overdue ? (
-                        <span className="text-red-700 font-extrabold text-[11px] block">
-                          Overdue by {Math.abs(dl.days_remaining)}d
+                      <div className="text-right flex-shrink-0">
+                        {dl.is_overdue ? (
+                          <span className="text-red-700 font-extrabold text-[11px] block">
+                            Overdue by {Math.abs(dl.days_remaining)}d
+                          </span>
+                        ) : (
+                          <span className="text-amber-800 font-bold text-[11px] block">
+                            {dl.days_remaining}d remaining
+                          </span>
+                        )}
+                        <span className="text-[9px] text-slate-500 block">
+                          {new Date(dl.prescribed_deadline).toLocaleDateString()}
                         </span>
-                      ) : (
-                        <span className="text-amber-800 font-bold text-[11px] block">
-                          {dl.days_remaining}d remaining
-                        </span>
-                      )}
-                      <span className="text-[9px] text-slate-500 block">
-                        {new Date(dl.prescribed_deadline).toLocaleDateString()}
-                      </span>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="py-6 text-center text-xs text-slate-400">
+                    {isLoading ? 'Loading deadlines...' : 'No upcoming deadlines recorded'}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -588,32 +631,40 @@ export const DashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {recentActivity.map((ev) => (
-                    <tr key={ev.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2 px-2.5 whitespace-nowrap text-slate-500 text-[10px] font-mono">
-                        {new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="py-2 px-2.5 font-bold text-[#092D62] whitespace-nowrap">
-                        <span
-                          onClick={() => navigate(`/cases/${ev.case_id}`)}
-                          className="hover:underline cursor-pointer"
-                        >
-                          {ev.case_id}
-                        </span>
-                      </td>
-                      <td className="py-2 px-2.5 whitespace-nowrap">
-                        <span className="text-[10px] bg-blue-50 text-blue-900 border border-blue-200 px-1.5 py-0.5 rounded font-medium">
-                          {ev.event_type}
-                        </span>
-                      </td>
-                      <td className="py-2 px-2.5 text-slate-700 whitespace-nowrap font-medium text-[11px]">
-                        {ev.actor_name}
-                      </td>
-                      <td className="py-2 px-2.5 text-slate-600 truncate max-w-xs text-[11px]">
-                        {ev.remarks || ev.new_value || 'Action recorded in central system'}
+                  {recentActivity.length > 0 ? (
+                    recentActivity.map((ev) => (
+                      <tr key={ev.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2 px-2.5 whitespace-nowrap text-slate-500 text-[10px] font-mono">
+                          {new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-2 px-2.5 font-bold text-[#092D62] whitespace-nowrap">
+                          <span
+                            onClick={() => navigate(`/cases/${ev.case_id}`)}
+                            className="hover:underline cursor-pointer"
+                          >
+                            {ev.case_id}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2.5 whitespace-nowrap">
+                          <span className="text-[10px] bg-blue-50 text-blue-900 border border-blue-200 px-1.5 py-0.5 rounded font-medium">
+                            {ev.event_type}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2.5 text-slate-700 whitespace-nowrap font-medium text-[11px]">
+                          {ev.actor_name}
+                        </td>
+                        <td className="py-2 px-2.5 text-slate-600 truncate max-w-xs text-[11px]">
+                          {ev.remarks || ev.new_value || 'Action recorded in central system'}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-400">
+                        {isLoading ? 'Loading activity...' : 'No recent activity records found'}
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

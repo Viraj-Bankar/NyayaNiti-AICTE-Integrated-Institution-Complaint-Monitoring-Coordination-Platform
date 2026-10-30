@@ -4,7 +4,44 @@ import {
   AuditLogItem, DocumentItem
 } from '../types';
 
-const API_BASE = '/api';
+/**
+ * Resolve base API URL:
+ * - Uses VITE_API_URL if configured (e.g. 'https://nyayaniti-aicte-integrated-institution.onrender.com')
+ * - Ensures /api prefix is present exactly once
+ * - Defaults to relative '/api' for local development with Vite proxy
+ */
+const getApiBase = (): string => {
+  const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  if (!envUrl) {
+    return '/api';
+  }
+  const clean = envUrl.replace(/\/+$/, '');
+  return clean.endsWith('/api') ? clean : `${clean}/api`;
+};
+
+export const API_BASE = getApiBase();
+
+/**
+ * Helper to build full URL with query parameters regardless of whether
+ * API_BASE is absolute (https://...) or relative (/api).
+ */
+export function buildApiUrl(path: string, params?: Record<string, any>): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const fullPath = `${API_BASE}${cleanPath}`;
+
+  const url = fullPath.startsWith('http://') || fullPath.startsWith('https://')
+    ? new URL(fullPath)
+    : new URL(fullPath, window.location.origin);
+
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        url.searchParams.append(k, String(v));
+      }
+    });
+  }
+  return url.toString();
+}
 
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('nyayaniti_token');
@@ -18,16 +55,36 @@ function getAuthHeaders(): HeadersInit {
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
+  const contentType = res.headers.get('content-type') || '';
   if (!res.ok) {
-    let errMessage = 'An error occurred';
+    let errMessage = `HTTP ${res.status}: ${res.statusText}`;
     try {
-      const err = await res.json();
-      errMessage = err.detail || err.message || JSON.stringify(err);
+      if (contentType.includes('application/json')) {
+        const err = await res.json();
+        errMessage = err.detail || err.message || JSON.stringify(err);
+      } else {
+        const text = await res.text();
+        if (text && text.length < 200) errMessage = text;
+      }
     } catch {
-      errMessage = res.statusText;
+      // fallback
     }
     throw new Error(errMessage);
   }
+
+  // Detect HTML responses served on 200 (e.g., SPA rewrite on missing routes)
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    if (text.trim().startsWith('<!doctype') || text.trim().startsWith('<html')) {
+      throw new Error(`Invalid API response: received HTML document instead of JSON from ${res.url}. Verify backend connectivity.`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Expected JSON response, but received ${contentType || 'non-JSON payload'}`);
+    }
+  }
+
   return res.json();
 }
 
@@ -103,13 +160,8 @@ export const api = {
     sort_by?: string;
     order?: string;
   } = {}): Promise<CaseItem[]> {
-    const url = new URL(`${window.location.origin}${API_BASE}/cases`);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        url.searchParams.append(k, String(v));
-      }
-    });
-    const res = await fetch(url.toString(), {
+    const url = buildApiUrl('/cases', params);
+    const res = await fetch(url, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -150,7 +202,8 @@ export const api = {
   },
 
   async escalateCase(id: string, reason: string): Promise<CaseItem> {
-    const res = await fetch(`${API_BASE}/cases/${id}/escalate?reason=${encodeURIComponent(reason)}`, {
+    const url = buildApiUrl(`/cases/${id}/escalate`, { reason });
+    const res = await fetch(url, {
       method: 'POST',
       headers: getAuthHeaders()
     });
@@ -159,13 +212,8 @@ export const api = {
 
   // Institutions
   async getInstitutions(params: { q?: string; state?: string; region?: string } = {}): Promise<Institution[]> {
-    const url = new URL(`${window.location.origin}${API_BASE}/institutions`);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        url.searchParams.append(k, String(v));
-      }
-    });
-    const res = await fetch(url.toString(), {
+    const url = buildApiUrl('/institutions', params);
+    const res = await fetch(url, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -189,13 +237,8 @@ export const api = {
 
   // Overlaps
   async getOverlapAlerts(params: { status?: string; min_similarity?: number; institution_id?: number } = {}): Promise<OverlapAlert[]> {
-    const url = new URL(`${window.location.origin}${API_BASE}/overlaps`);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        url.searchParams.append(k, String(v));
-      }
-    });
-    const res = await fetch(url.toString(), {
+    const url = buildApiUrl('/overlaps', params);
+    const res = await fetch(url, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -232,13 +275,8 @@ export const api = {
 
   // Action Conflicts
   async getActionConflicts(params: { status?: string; severity?: string; institution_id?: number } = {}): Promise<ActionConflictAlert[]> {
-    const url = new URL(`${window.location.origin}${API_BASE}/action-conflicts`);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        url.searchParams.append(k, String(v));
-      }
-    });
-    const res = await fetch(url.toString(), {
+    const url = buildApiUrl('/action-conflicts', params);
+    const res = await fetch(url, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -282,8 +320,7 @@ export const api = {
   },
 
   async updateCoordinationTask(taskId: number, status: string, remarks?: string): Promise<any> {
-    let url = `${API_BASE}/coordination/tasks/${taskId}?status=${encodeURIComponent(status)}`;
-    if (remarks) url += `&remarks=${encodeURIComponent(remarks)}`;
+    const url = buildApiUrl(`/coordination/tasks/${taskId}`, { status, remarks });
     const res = await fetch(url, {
       method: 'PATCH',
       headers: getAuthHeaders()
@@ -293,7 +330,8 @@ export const api = {
 
   // Surges
   async getSurges(windowDays: number = 30): Promise<any> {
-    const res = await fetch(`${API_BASE}/surges?window_days=${windowDays}`, {
+    const url = buildApiUrl('/surges', { window_days: windowDays });
+    const res = await fetch(url, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -320,7 +358,8 @@ export const api = {
 
   // Notifications
   async getNotifications(unreadOnly: boolean = false): Promise<NotificationItem[]> {
-    const res = await fetch(`${API_BASE}/notifications?unread_only=${unreadOnly}`, {
+    const url = buildApiUrl('/notifications', { unread_only: unreadOnly });
+    const res = await fetch(url, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -354,7 +393,7 @@ export const api = {
     const token = localStorage.getItem('nyayaniti_token');
     const headers: HeadersInit = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    
+
     const res = await fetch(`${API_BASE}/documents/case/${caseId}`, {
       method: 'POST',
       headers,
@@ -365,11 +404,8 @@ export const api = {
 
   // Audit Logs
   async getAuditLogs(params: { event_type?: string; entity_type?: string; entity_id?: string } = {}): Promise<AuditLogItem[]> {
-    const url = new URL(`${window.location.origin}${API_BASE}/audit`);
-    Object.entries(params).forEach(([k, v]) => {
-      if (v) url.searchParams.append(k, String(v));
-    });
-    const res = await fetch(url.toString(), {
+    const url = buildApiUrl('/audit', params);
+    const res = await fetch(url, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);

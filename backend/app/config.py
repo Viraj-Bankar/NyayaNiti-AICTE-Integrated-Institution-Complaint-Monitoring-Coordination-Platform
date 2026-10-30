@@ -23,6 +23,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://nyaya-niti-aicte-integrated-institu.vercel.app",
     ]
 
     SBERT_MODEL_NAME: str = "all-MiniLM-L6-v2"
