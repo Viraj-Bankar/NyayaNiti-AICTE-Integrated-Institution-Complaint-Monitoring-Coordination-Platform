@@ -7,6 +7,7 @@ import { GovNavBar } from './components/common/GovNavBar';
 import { GovFooter } from './components/common/GovFooter';
 
 import { LandingPage } from './pages/LandingPage';
+import { ExplorePage } from './pages/ExplorePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CaseRegisterPage } from './pages/CaseRegisterPage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
@@ -34,6 +35,7 @@ export const App: React.FC = () => {
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<LandingPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/cases" element={<CaseRegisterPage />} />
               <Route path="/cases/:id" element={<CaseDetailPage />} />
