@@ -1,10 +1,16 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Eye, Globe, UserCheck, Shield } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Eye, Globe, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const GovTopBar: React.FC = () => {
   const { fontSize, setFontSize, highContrast, toggleHighContrast, language, setLanguage, user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <div className="bg-[#061E46] text-slate-200 text-xs py-1.5 px-4 border-b border-slate-700/60 select-none">
@@ -71,28 +77,20 @@ export const GovTopBar: React.FC = () => {
             <span>{language === 'en' ? 'हिन्दी' : 'English'}</span>
           </button>
 
-          {/* Auth Status & Quick Action */}
-          {user ? (
+          {/* Auth Status & Quick Action (Authenticated Only) */}
+          {user && (
             <div className="flex items-center gap-2 border-l border-slate-700 pl-2">
               <span className="bg-[#1E5AA8] text-white px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1">
                 <Shield className="w-3 h-3 text-[#FFB900]" />
                 {user.role.replace('_', ' ').toUpperCase()}
               </span>
               <button
-                onClick={logout}
-                className="text-red-300 hover:text-red-100 underline text-[11px]"
+                onClick={handleLogout}
+                className="text-red-300 hover:text-red-100 underline text-[11px] cursor-pointer"
               >
                 Logout
               </button>
             </div>
-          ) : (
-            <Link
-              to="/login"
-              className="flex items-center gap-1 bg-[#FFB900] text-[#061E46] px-2.5 py-0.5 rounded font-semibold text-[11px] hover:bg-[#FFC526] transition-colors"
-            >
-              <UserCheck className="w-3 h-3" />
-              Officer Login
-            </Link>
           )}
         </div>
       </div>

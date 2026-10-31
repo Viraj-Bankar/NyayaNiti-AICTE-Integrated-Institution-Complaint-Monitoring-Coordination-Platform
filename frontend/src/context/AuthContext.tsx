@@ -28,6 +28,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [highContrast, setHighContrast] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
 
+  const logout = () => {
+    localStorage.removeItem('nyayaniti_token');
+    localStorage.removeItem('nyayaniti_user');
+    setUser(null);
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('nyayaniti_token');
     const storedUser = localStorage.getItem('nyayaniti_user');
@@ -53,17 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
       }
     } else {
-      // Auto-initialize demo evaluator session so charts and data are instantly live
-      api.demoLogin('super_admin')
-        .then((res) => {
-          localStorage.setItem('nyayaniti_token', res.access_token);
-          localStorage.setItem('nyayaniti_user', JSON.stringify(res.user));
-          setUser(res.user);
-        })
-        .catch((err) => {
-          console.warn('Backend not ready for initial demo login:', err);
-        })
-        .finally(() => setIsLoading(false));
+      setUser(null);
+      setIsLoading(false);
     }
   }, []);
 
@@ -104,12 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('nyayaniti_token');
-    localStorage.removeItem('nyayaniti_user');
-    setUser(null);
   };
 
   const hasRole = (roles: string[]): boolean => {

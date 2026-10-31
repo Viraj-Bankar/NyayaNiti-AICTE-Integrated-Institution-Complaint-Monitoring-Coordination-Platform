@@ -107,7 +107,7 @@ export const ExplorePage: React.FC = () => {
       {/* ============================================================ */}
       {/* SECTION 1 – HERO SECTION                                     */}
       {/* ============================================================ */}
-      <section className="bg-gradient-to-b from-[#061E46] via-[#092D62] to-[#0D3875] text-white py-14 px-4 border-b-4 border-[#FFB900] shadow-md relative overflow-hidden">
+      <section id="hero" className="bg-gradient-to-b from-[#061E46] via-[#092D62] to-[#0D3875] text-white py-14 px-4 border-b-4 border-[#FFB900] shadow-md relative overflow-hidden">
         {/* Subtle background decorative grid */}
         <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
 
@@ -299,7 +299,7 @@ export const ExplorePage: React.FC = () => {
       {/* ============================================================ */}
       {/* SECTION 3 – THE PROBLEM WE ADDRESS / THE CHALLENGE           */}
       {/* ============================================================ */}
-      <section className="py-14 px-4 bg-[#F4F6F9] border-b border-slate-200">
+      <section id="challenges" className="py-14 px-4 bg-[#F4F6F9] border-b border-slate-200">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-bold text-[#C62828] uppercase tracking-wider bg-red-50 px-2.5 py-1 rounded border border-red-200">
@@ -428,7 +428,7 @@ export const ExplorePage: React.FC = () => {
       {/* ============================================================ */}
       {/* SECTION 4 – THE VISION & ARCHITECTURAL ECOSYSTEM             */}
       {/* ============================================================ */}
-      <section className="py-14 px-4 bg-white border-b border-slate-200">
+      <section id="vision" className="py-14 px-4 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-center max-w-3xl mx-auto space-y-2">
             <span className="text-xs font-bold text-[#092D62] uppercase tracking-wider bg-blue-50 px-2.5 py-1 rounded border border-blue-200">
@@ -1135,7 +1135,7 @@ export const ExplorePage: React.FC = () => {
       {/* ============================================================ */}
       {/* SECTION 9 – CRITICAL CASES & FIELD INTELLIGENCE              */}
       {/* ============================================================ */}
-      <section className="py-14 px-4 bg-white border-b border-slate-200">
+      <section id="critical-cases" className="py-14 px-4 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-bold text-[#C62828] uppercase tracking-wider bg-red-50 px-2.5 py-1 rounded border border-red-200">
@@ -1194,7 +1194,7 @@ export const ExplorePage: React.FC = () => {
       {/* ============================================================ */}
       {/* SECTION 10 – INSTITUTIONAL & ADMINISTRATIVE BENEFITS         */}
       {/* ============================================================ */}
-      <section className="py-14 px-4 bg-[#F4F6F9] border-b border-slate-200">
+      <section id="benefits" className="py-14 px-4 bg-[#F4F6F9] border-b border-slate-200">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-bold text-[#218653] uppercase tracking-wider bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
@@ -1275,7 +1275,7 @@ export const ExplorePage: React.FC = () => {
       {/* ============================================================ */}
       {/* SECTION 11 – FUTURE VISION (8 POSSIBILITIES)                 */}
       {/* ============================================================ */}
-      <section className="py-14 px-4 bg-white border-b border-slate-200">
+      <section id="future-vision" className="py-14 px-4 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-center max-w-3xl mx-auto space-y-2">
             <span className="text-xs font-bold text-[#092D62] uppercase tracking-wider bg-blue-50 px-2.5 py-1 rounded border border-blue-200">
@@ -1384,7 +1384,7 @@ export const ExplorePage: React.FC = () => {
       {/* ============================================================ */}
       {/* SECTION 12 – TRANSPARENCY & ACCOUNTABILITY (7 PRINCIPLES)    */}
       {/* ============================================================ */}
-      <section className="py-14 px-4 bg-[#F4F6F9] border-b border-slate-200">
+      <section id="transparency" className="py-14 px-4 bg-[#F4F6F9] border-b border-slate-200">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-center max-w-3xl mx-auto space-y-2">
             <span className="text-xs font-bold text-[#092D62] uppercase tracking-wider bg-white px-2.5 py-1 rounded border border-slate-300">
@@ -1650,9 +1650,9 @@ export const ExplorePage: React.FC = () => {
       </section>
 
       {/* ============================================================ */}
-      {/* SECTION 14 – FINAL CALL TO ACTION                            */}
+      {/* SECTION 15 – FINAL CALL TO ACTION                            */}
       {/* ============================================================ */}
-      <section className="py-16 px-4 bg-gradient-to-r from-[#061E46] via-[#092D62] to-[#061E46] text-white text-center">
+      <section id="cta" className="py-16 px-4 bg-gradient-to-r from-[#061E46] via-[#092D62] to-[#061E46] text-white text-center">
         <div className="max-w-4xl mx-auto space-y-5">
           <div className="w-12 h-12 rounded-full bg-[#FFB900] text-[#061E46] flex items-center justify-center font-bold mx-auto shadow-md">
             <Compass className="w-6 h-6" />
@@ -1676,10 +1676,12 @@ export const ExplorePage: React.FC = () => {
             </button>
 
             <button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="btn-3d-white px-6 py-3 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md"
             >
-              <span>Return to Home</span>
+              <span>Back to Top</span>
               <ArrowUpRight className="w-4 h-4 text-[#092D62]" />
             </button>
           </div>

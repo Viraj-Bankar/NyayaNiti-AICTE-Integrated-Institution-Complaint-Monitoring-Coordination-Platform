@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { GovTopBar } from './components/common/GovTopBar';
 import { GovHeader } from './components/common/GovHeader';
 import { GovNavBar } from './components/common/GovNavBar';
@@ -23,6 +23,48 @@ import { AuditLogsPage } from './pages/AuditLogsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { LoginPage } from './pages/LoginPage';
 
+/**
+ * RootRoute:
+ * - Unauthenticated visitors: See ONLY the comprehensive public Explore page.
+ * - Authenticated officers: See the operational LandingPage (Home).
+ */
+const RootRoute: React.FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#092D62]" />
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <LandingPage /> : <ExplorePage />;
+};
+
+/**
+ * ProtectedRoute:
+ * Protects operational application routes from unauthenticated public visitors.
+ * Redirects unauthenticated attempts directly to the public Explore page.
+ */
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#092D62]" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
+
 export const App: React.FC = () => {
   return (
     <AuthProvider>
@@ -34,22 +76,128 @@ export const App: React.FC = () => {
           
           <main className="flex-1">
             <Routes>
-              <Route path="/" element={<LandingPage />} />
+              {/* Root URL: Public Explore for visitors; Operational Home for authenticated officers */}
+              <Route path="/" element={<RootRoute />} />
+
+              {/* Dedicated Public Explore Route */}
               <Route path="/explore" element={<ExplorePage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/cases" element={<CaseRegisterPage />} />
-              <Route path="/cases/:id" element={<CaseDetailPage />} />
-              <Route path="/institutions" element={<InstitutionListPage />} />
-              <Route path="/institutions/:id" element={<InstitutionProfilePage />} />
-              <Route path="/overlaps" element={<OverlapCenterPage />} />
-              <Route path="/action-conflicts" element={<ActionConflictPage />} />
-              <Route path="/coordination" element={<CoordinationWorkspacePage />} />
-              <Route path="/surges" element={<SurgeDetectionPage />} />
-              <Route path="/validation" element={<ValidationSimulatorPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/audit" element={<AuditLogsPage />} />
-              <Route path="/admin" element={<AdminSettingsPage />} />
+
+              {/* Officer Login Route */}
               <Route path="/login" element={<LoginPage />} />
+
+              {/* Protected Operational Routes */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cases"
+                element={
+                  <ProtectedRoute>
+                    <CaseRegisterPage />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Route alias for Case Register */}
+              <Route path="/case-register" element={<Navigate to="/cases" replace />} />
+
+              <Route
+                path="/cases/:id"
+                element={
+                  <ProtectedRoute>
+                    <CaseDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/institutions"
+                element={
+                  <ProtectedRoute>
+                    <InstitutionListPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/institutions/:id"
+                element={
+                  <ProtectedRoute>
+                    <InstitutionProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/overlaps"
+                element={
+                  <ProtectedRoute>
+                    <OverlapCenterPage />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Route alias for Overlap Center */}
+              <Route path="/overlap-center" element={<Navigate to="/overlaps" replace />} />
+
+              <Route
+                path="/action-conflicts"
+                element={
+                  <ProtectedRoute>
+                    <ActionConflictPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/coordination"
+                element={
+                  <ProtectedRoute>
+                    <CoordinationWorkspacePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/surges"
+                element={
+                  <ProtectedRoute>
+                    <SurgeDetectionPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/validation"
+                element={
+                  <ProtectedRoute>
+                    <ValidationSimulatorPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports"
+                element={
+                  <ProtectedRoute>
+                    <ReportsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/audit"
+                element={
+                  <ProtectedRoute>
+                    <AuditLogsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Fallback Catch-all: Redirect to Root */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
