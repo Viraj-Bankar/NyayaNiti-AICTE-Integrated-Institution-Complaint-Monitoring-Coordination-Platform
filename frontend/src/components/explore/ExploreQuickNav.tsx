@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Compass, Info, AlertTriangle, Layers, Cpu,
-  Sparkles, CheckCircle2, ShieldCheck, HelpCircle, MessageSquare
+  Sparkles, CheckCircle2, ShieldCheck, HelpCircle, MessageSquare, Globe
 } from 'lucide-react';
 
 interface QuickNavItem {
@@ -18,7 +18,8 @@ const NAV_ITEMS: QuickNavItem[] = [
   { id: 'capabilities', label: 'Capabilities', icon: Cpu },
   { id: 'ai-technology', label: 'AI & ML', icon: Sparkles },
   { id: 'how-it-works', label: 'How It Works', icon: CheckCircle2 },
-  { id: 'security-trust', label: 'Security & DPDP', icon: ShieldCheck },
+  { id: 'security-trust', label: 'Security & Governance', icon: ShieldCheck },
+  { id: 'future-vision', label: 'Future Scope', icon: Globe },
   { id: 'faq', label: 'FAQ', icon: HelpCircle },
   { id: 'contact', label: 'Feedback', icon: MessageSquare }
 ];
