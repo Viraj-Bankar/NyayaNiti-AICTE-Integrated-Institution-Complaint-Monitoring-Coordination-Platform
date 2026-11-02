@@ -1,14 +1,20 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import { api, setUnauthorizedHandler } from '../services/api';
 
+export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'expired';
+
 interface AuthContextType {
   user: User | null;
+  authStatus: AuthStatus;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isSessionExpired: boolean;
+  sessionError: string | null;
   login: (u: string, p: string) => Promise<void>;
   demoLogin: (role: string) => Promise<void>;
   logout: () => void;
+  clearSessionError: () => void;
   hasRole: (roles: string[]) => boolean;
   // Accessibility controls
   fontSize: 'sm' | 'md' | 'lg';
@@ -21,57 +27,130 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Safely inspect client-side JWT expiration claim without external libraries.
+ * Returns true if expired or corrupted; false if exp claim is in the future.
+ * Never logs or exposes the raw token.
+ */
+function isJwtExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const parsed = JSON.parse(jsonPayload);
+    if (!parsed || typeof parsed.exp !== 'number') {
+      return false;
+    }
+    // Compare epoch seconds to current time
+    return parsed.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('loading');
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [highContrast, setHighContrast] = useState<boolean>(false);
   const [language, setLanguage] = useState<'en' | 'hi'>('en');
 
-  const logout = () => {
+  const clearSessionStorage = useCallback(() => {
     localStorage.removeItem('nyayaniti_token');
     localStorage.removeItem('nyayaniti_user');
+  }, []);
+
+  const logout = useCallback(() => {
+    clearSessionStorage();
     setUser(null);
-  };
+    setAuthStatus('unauthenticated');
+    setSessionError(null);
+  }, [clearSessionStorage]);
 
+  const handleSessionExpired = useCallback(() => {
+    clearSessionStorage();
+    setUser(null);
+    setAuthStatus('expired');
+    setSessionError('Your administrative session has expired. Please sign in again.');
+  }, [clearSessionStorage]);
+
+  const clearSessionError = useCallback(() => {
+    setSessionError(null);
+  }, []);
+
+  // ============================================================
+  // SECURE AUTHENTICATION INITIALIZATION
+  // 1. Never auto-assign super_admin or call demoLogin on startup
+  // 2. Validate token against backend /api/auth/me before setting user
+  // 3. Clear invalid/expired tokens immediately
+  // 4. Set loading=true during check to prevent admin UI flash
+  // ============================================================
   useEffect(() => {
-    // Register global unauthorized session handler
-    setUnauthorizedHandler(() => {
-      logout();
-    });
+    setUnauthorizedHandler(handleSessionExpired);
 
-    const token = localStorage.getItem('nyayaniti_token');
-    const storedUser = localStorage.getItem('nyayaniti_user');
-    if (token && storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        setUser(parsed);
-        // Verify token with backend
-        api.getMe()
-          .then((verified) => {
-            setUser(verified);
-            localStorage.setItem('nyayaniti_user', JSON.stringify(verified));
-          })
-          .catch((err) => {
-            // Only clear auth on explicit 401/unauthorized errors
-            if (err?.message?.includes('credentials') || err?.message?.includes('expired') || err?.message?.includes('401')) {
-              logout();
-            }
-          })
-          .finally(() => setIsLoading(false));
-      } catch {
-        logout();
-        setIsLoading(false);
+    const validateExistingSession = async () => {
+      setAuthStatus('loading');
+
+      const token = localStorage.getItem('nyayaniti_token');
+      if (!token) {
+        // No token present: strictly unauthenticated
+        clearSessionStorage();
+        setUser(null);
+        setAuthStatus('unauthenticated');
+        return;
       }
-    } else {
-      setUser(null);
-      setIsLoading(false);
-    }
+
+      // Check client-side expiration
+      if (isJwtExpired(token)) {
+        clearSessionStorage();
+        setUser(null);
+        setAuthStatus('expired');
+        setSessionError('Previous session has expired. Please sign in.');
+        return;
+      }
+
+      // Validate against the server via /api/auth/me
+      try {
+        const verifiedUser = await api.getMe();
+        if (verifiedUser && verifiedUser.id && verifiedUser.role) {
+          setUser(verifiedUser);
+          localStorage.setItem('nyayaniti_user', JSON.stringify(verifiedUser));
+          setAuthStatus('authenticated');
+          setSessionError(null);
+        } else {
+          throw new Error('Incomplete user profile received from authority registry');
+        }
+      } catch (err: any) {
+        // Validation failed: clear tokens and set unauthenticated
+        clearSessionStorage();
+        setUser(null);
+
+        const errMsg = err?.message || '';
+        if (errMsg.includes('401') || errMsg.includes('credentials') || errMsg.includes('expired')) {
+          setAuthStatus('expired');
+          setSessionError('Your session credentials could not be verified. Please log in.');
+        } else {
+          // Backend offline or network error: do NOT grant access or auto-login
+          setAuthStatus('unauthenticated');
+          setSessionError('Authority verification service temporarily unavailable.');
+        }
+      }
+    };
+
+    validateExistingSession();
 
     return () => {
       setUnauthorizedHandler(null);
     };
-  }, []);
+  }, [clearSessionStorage, handleSessionExpired]);
 
   // Sync high-contrast class to root body
   useEffect(() => {
@@ -88,27 +167,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     document.body.classList.add(`font-size-${fontSize}`);
   }, [fontSize]);
 
+  // Credential Login (Username / Password)
   const login = async (u: string, p: string) => {
-    setIsLoading(true);
+    setAuthStatus('loading');
+    setSessionError(null);
     try {
       const res = await api.login(u, p);
+      if (!res.access_token || !res.user) {
+        throw new Error('Authentication response missing access token or user credentials.');
+      }
       localStorage.setItem('nyayaniti_token', res.access_token);
       localStorage.setItem('nyayaniti_user', JSON.stringify(res.user));
       setUser(res.user);
-    } finally {
-      setIsLoading(false);
+      setAuthStatus('authenticated');
+    } catch (err) {
+      clearSessionStorage();
+      setUser(null);
+      setAuthStatus('unauthenticated');
+      throw err;
     }
   };
 
+  // Explicit Evaluator Quick Role Selection (Triggered ONLY by manual button click)
   const demoLogin = async (role: string) => {
-    setIsLoading(true);
+    setAuthStatus('loading');
+    setSessionError(null);
     try {
       const res = await api.demoLogin(role);
+      if (!res.access_token || !res.user) {
+        throw new Error('Demo switch failed: invalid credentials returned.');
+      }
       localStorage.setItem('nyayaniti_token', res.access_token);
       localStorage.setItem('nyayaniti_user', JSON.stringify(res.user));
       setUser(res.user);
-    } finally {
-      setIsLoading(false);
+      setAuthStatus('authenticated');
+    } catch (err) {
+      clearSessionStorage();
+      setUser(null);
+      setAuthStatus('unauthenticated');
+      throw err;
     }
   };
 
@@ -120,15 +217,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const toggleHighContrast = () => setHighContrast(prev => !prev);
 
+  const isAuthenticated = authStatus === 'authenticated' && !!user;
+  const isLoading = authStatus === 'loading';
+  const isSessionExpired = authStatus === 'expired';
+
   return (
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        authStatus,
+        isAuthenticated,
         isLoading,
+        isSessionExpired,
+        sessionError,
         login,
         demoLogin,
         logout,
+        clearSessionError,
         hasRole,
         fontSize,
         setFontSize,

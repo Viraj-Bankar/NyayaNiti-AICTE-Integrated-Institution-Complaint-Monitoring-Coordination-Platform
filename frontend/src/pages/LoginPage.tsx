@@ -9,7 +9,7 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login, demoLogin, isAuthenticated } = useAuth();
+  const { login, demoLogin, isAuthenticated, sessionError, clearSessionError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -30,6 +30,7 @@ export const LoginPage: React.FC = () => {
     }
     setIsSubmitting(true);
     setError(null);
+    clearSessionError();
     try {
       await login(username, password);
       navigate(destination, { replace: true });
@@ -43,6 +44,7 @@ export const LoginPage: React.FC = () => {
   const handleQuickDemo = async (role: string) => {
     setIsSubmitting(true);
     setError(null);
+    clearSessionError();
     try {
       await demoLogin(role);
       navigate(destination, { replace: true });
@@ -72,6 +74,23 @@ export const LoginPage: React.FC = () => {
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md space-y-4">
         {/* Main Login Card */}
         <div className="bg-white py-8 px-6 shadow-md rounded-lg border border-slate-200 space-y-5">
+          {sessionError && (
+            <div className="bg-amber-50 text-amber-900 p-3 rounded border border-amber-300 text-xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <span>{sessionError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={clearSessionError}
+                className="text-amber-700 hover:text-amber-900 font-bold text-sm cursor-pointer px-1"
+                title="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 text-red-800 p-3 rounded border border-red-200 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
