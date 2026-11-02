@@ -1,42 +1,17 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { AccessDenied } from './AccessDenied';
+import { ProtectedRoute } from './ProtectedRoute';
 
-interface RoleRouteProps {
+export interface RoleRouteProps {
   allowedRoles: string[];
   children: React.ReactNode;
 }
 
 /**
  * RoleRoute:
- * Enforces role-based access control on frontend routes.
- * - Redirects unauthenticated visitors to /login preserving target location.
- * - Displays an official AccessDenied screen if the authenticated user lacks permissions.
- * - Permits super_admin unconditionally.
+ * Backward-compatible wrapper delegating to ProtectedRoute with required roles.
  */
 export const RoleRoute: React.FC<RoleRouteProps> = ({ allowedRoles, children }) => {
-  const { isAuthenticated, isLoading, hasRole } = useAuth();
-  const location = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#092D62]" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (!hasRole(allowedRoles)) {
-    return <AccessDenied requiredRoles={allowedRoles} />;
-  }
-
-  return <>{children}</>;
+  return <ProtectedRoute allowedRoles={allowedRoles}>{children}</ProtectedRoute>;
 };
 
 export default RoleRoute;
-

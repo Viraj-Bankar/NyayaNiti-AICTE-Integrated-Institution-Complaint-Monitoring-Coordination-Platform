@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Shield, Sparkles, ChevronDown, LogIn } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 export const GovHeader: React.FC = () => {
   const { user, isAuthenticated, demoLogin } = useAuth();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const location = useLocation();
 
   const handleRoleSwitch = async (role: string) => {
     await demoLogin(role);
@@ -51,6 +52,7 @@ export const GovHeader: React.FC = () => {
           <div className="flex items-center gap-3">
             <Link
               to="/login"
+              state={location.state}
               className="btn-3d-amber px-4 sm:px-5 py-2 rounded text-xs tracking-wide font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
               title="Official Authorized Officer Access"
             >

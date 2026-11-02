@@ -1,11 +1,11 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GovTopBar } from './components/common/GovTopBar';
 import { GovHeader } from './components/common/GovHeader';
 import { GovNavBar } from './components/common/GovNavBar';
 import { GovFooter } from './components/common/GovFooter';
-import { RoleRoute } from './components/common/RoleRoute';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
 
 import { LandingPage } from './pages/LandingPage';
 import { ExplorePage } from './pages/ExplorePage';
@@ -43,30 +43,6 @@ const RootRoute: React.FC = () => {
   return isAuthenticated ? <LandingPage /> : <ExplorePage />;
 };
 
-/**
- * ProtectedRoute:
- * Protects operational application routes from unauthenticated public visitors.
- * Redirects unauthenticated attempts directly to /login with original location state preserved.
- */
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#092D62]" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
-};
-
 export const App: React.FC = () => {
   return (
     <AuthProvider>
@@ -78,6 +54,7 @@ export const App: React.FC = () => {
           
           <main className="flex-1">
             <Routes>
+              {/* Public Routes */}
               {/* Root URL: Public Explore for visitors; Operational Home for authenticated officers */}
               <Route path="/" element={<RootRoute />} />
 
@@ -87,7 +64,7 @@ export const App: React.FC = () => {
               {/* Officer Login Route */}
               <Route path="/login" element={<LoginPage />} />
 
-              {/* Protected Operational Routes */}
+              {/* Protected Authority Routes */}
               <Route
                 path="/dashboard"
                 element={
@@ -105,7 +82,14 @@ export const App: React.FC = () => {
                 }
               />
               {/* Route alias for Case Register */}
-              <Route path="/case-register" element={<Navigate to="/cases" replace />} />
+              <Route
+                path="/case-register"
+                element={
+                  <ProtectedRoute>
+                    <CaseRegisterPage />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/cases/:id"
@@ -140,7 +124,14 @@ export const App: React.FC = () => {
                 }
               />
               {/* Route alias for Overlap Center */}
-              <Route path="/overlap-center" element={<Navigate to="/overlaps" replace />} />
+              <Route
+                path="/overlap-center"
+                element={
+                  <ProtectedRoute>
+                    <OverlapCenterPage />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/action-conflicts"
@@ -185,17 +176,26 @@ export const App: React.FC = () => {
               <Route
                 path="/audit"
                 element={
-                  <RoleRoute allowedRoles={['super_admin', 'monitoring_officer']}>
+                  <ProtectedRoute allowedRoles={['super_admin', 'monitoring_officer']}>
                     <AuditLogsPage />
-                  </RoleRoute>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/admin"
                 element={
-                  <RoleRoute allowedRoles={['super_admin']}>
+                  <ProtectedRoute allowedRoles={['super_admin']}>
                     <AdminSettingsPage />
-                  </RoleRoute>
+                  </ProtectedRoute>
+                }
+              />
+              {/* Route alias for Settings */}
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute allowedRoles={['super_admin']}>
+                    <AdminSettingsPage />
+                  </ProtectedRoute>
                 }
               />
 

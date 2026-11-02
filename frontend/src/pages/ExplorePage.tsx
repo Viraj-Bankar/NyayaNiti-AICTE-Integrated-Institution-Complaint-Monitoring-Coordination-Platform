@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Compass, Shield, ShieldCheck, GitMerge, FileText, Building2,
   AlertTriangle, CheckCircle2, Layers, Clock, Users, ArrowRight,
@@ -12,6 +12,7 @@ import {
 
 export const ExplorePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // FAQ Expandable State
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
@@ -141,7 +142,7 @@ export const ExplorePage: React.FC = () => {
               </button>
 
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/login', { state: location.state })}
                 className="btn-3d-white px-5 py-2.5 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md"
               >
                 <Shield className="w-4 h-4 text-[#092D62]" />
@@ -1668,7 +1669,7 @@ export const ExplorePage: React.FC = () => {
 
           <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/login', { state: location.state })}
               className="btn-3d-amber px-6 py-3 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md"
             >
               <Shield className="w-4 h-4" />

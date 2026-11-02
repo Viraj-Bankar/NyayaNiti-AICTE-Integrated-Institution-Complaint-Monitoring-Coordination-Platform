@@ -149,7 +149,7 @@ def get_alert_ticker(
 @router.get("/charts")
 def get_dashboard_charts(
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: User = Depends(get_current_user)
 ):
     now = datetime.utcnow()
     
@@ -267,7 +267,7 @@ def get_dashboard_charts(
 @router.get("/recent-activity")
 def get_recent_activity(
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: User = Depends(get_current_user)
 ):
     events = (
         db.query(CaseEvent)
@@ -294,7 +294,7 @@ def get_recent_activity(
 @router.get("/upcoming-deadlines")
 def get_upcoming_deadlines(
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: User = Depends(get_current_user)
 ):
     now = datetime.utcnow()
     cases = (
