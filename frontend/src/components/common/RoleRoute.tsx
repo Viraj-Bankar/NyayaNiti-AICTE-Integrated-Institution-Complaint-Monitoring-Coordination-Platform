@@ -39,3 +39,4 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({ allowedRoles, children }) 
 };
 
 export default RoleRoute;
+
