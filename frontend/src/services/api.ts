@@ -475,7 +475,7 @@ export const api = {
   // CITIZEN & COMPLAINANT PORTAL APIS
   // ============================================================
   async complainantRegister(data: ComplainantRegisterData): Promise<Complainant> {
-    const res = await fetch(`${API_BASE}/complainant/auth/register`, {
+    const res = await fetch(`${API_BASE}/complainant/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -484,7 +484,7 @@ export const api = {
   },
 
   async complainantLogin(email: string, password: string): Promise<{ access_token: string; token_type: string; complainant: Complainant }> {
-    const res = await fetch(`${API_BASE}/complainant/auth/login`, {
+    const res = await fetch(`${API_BASE}/complainant/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -493,7 +493,7 @@ export const api = {
   },
 
   async complainantDemoLogin(): Promise<{ access_token: string; token_type: string; complainant: Complainant }> {
-    const res = await fetch(`${API_BASE}/complainant/auth/demo-login`, {
+    const res = await fetch(`${API_BASE}/complainant/demo-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
@@ -501,7 +501,7 @@ export const api = {
   },
 
   async getComplainantMe(): Promise<Complainant> {
-    const res = await fetch(`${API_BASE}/complainant/auth/me`, {
+    const res = await fetch(`${API_BASE}/complainant/me`, {
       headers: getComplainantAuthHeaders()
     });
     return handleResponse(res);

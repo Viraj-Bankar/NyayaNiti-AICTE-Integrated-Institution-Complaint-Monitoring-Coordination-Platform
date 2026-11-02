@@ -31,3 +31,4 @@ export const ComplainantProtectedRoute: React.FC<ComplainantProtectedRouteProps>
 };
 
 export default ComplainantProtectedRoute;
+

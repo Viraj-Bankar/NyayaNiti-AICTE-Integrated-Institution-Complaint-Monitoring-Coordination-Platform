@@ -13,7 +13,7 @@ export const ComplainantLoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/complainant/dashboard';
+  const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/complainant/home';
 
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -183,3 +183,4 @@ export const ComplainantLoginPage: React.FC = () => {
 };
 
 export default ComplainantLoginPage;
+

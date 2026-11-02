@@ -15,14 +15,17 @@ from app.schemas.schemas import (
 from app.api.auth import hash_password, verify_password, create_access_token
 from app.services.audit_service import log_audit_event
 
-router = APIRouter(prefix="/complainant/auth", tags=["Complainant Authentication"])
+router = APIRouter(prefix="/complainant", tags=["Complainant Authentication"])
 security = HTTPBearer(auto_error=False)
 
 def create_complainant_token(complainant: Complainant) -> str:
+    """
+    Generate isolated JWT access token for complainants with strict audience and role claims.
+    """
     return create_access_token(
         data={
             "sub": complainant.email,
-            "entity_id": complainant.id,
+            "complainant_id": complainant.id,
             "role": "complainant",
             "name": complainant.full_name
         },
@@ -34,6 +37,11 @@ def get_current_complainant(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> Complainant:
+    """
+    FastAPI dependency for complainant-only endpoints.
+    Strictly verifies audience == 'nyayaniti-complainant' and token_type == 'complainant_access'.
+    Rejects officer tokens with HTTP 403 Forbidden.
+    """
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -42,17 +50,22 @@ def get_current_complainant(
         )
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_aud": False})
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_aud": False}
+        )
         email: str = payload.get("sub")
         token_type: str = payload.get("token_type")
         aud: str = payload.get("aud")
         role: str = payload.get("role")
 
-        # STRICT ISOLATION: Reject officer tokens from complainant endpoints
+        # STRICT AUDIENCE & ROLE ISOLATION: Reject officer tokens
         if role != "complainant" or token_type != "complainant_access" or aud != "nyayaniti-complainant":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: Officer tokens cannot access complainant portal endpoints."
+                detail="Access denied: Complainant portal is restricted to registered citizens."
             )
 
         if not email:
@@ -63,44 +76,53 @@ def get_current_complainant(
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
     complainant = db.query(Complainant).filter(
-        Complainant.email == email,
-        Complainant.is_active == True
+        Complainant.email == email
     ).first()
     if complainant is None:
-        raise HTTPException(status_code=401, detail="Complainant account not found or deactivated")
+        raise HTTPException(status_code=401, detail="Complainant account not found")
+
+    # Inactive / suspended account handling
+    if not complainant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your complainant account has been suspended or deactivated. Please contact support."
+        )
+
     return complainant
 
-@router.post("/register", response_model=ComplainantResponse, status_code=status.HTTP_201_CREATED)
-def register_complainant(
-    reg_in: ComplainantRegister,
-    db: Session = Depends(get_db)
-):
-    # Validate password confirmation
+
+def _handle_registration(reg_in: ComplainantRegister, db: Session) -> Complainant:
+    # 1. Validate password confirmation
     if reg_in.password != reg_in.confirm_password:
         raise HTTPException(status_code=400, detail="Password and confirm password do not match.")
 
-    # Validate password length
-    if len(reg_in.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+    # 2. Validate password complexity and length
+    if len(reg_in.password) < 8 or len(reg_in.password) > 128:
+        raise HTTPException(status_code=400, detail="Password must be between 8 and 128 characters long.")
 
-    # Validate 10-digit Indian mobile format
+    if not (re.search(r"[A-Z]", reg_in.password) and re.search(r"[a-z]", reg_in.password) and re.search(r"\d", reg_in.password)):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must contain at least one uppercase letter, one lowercase letter, and one number."
+        )
+
+    # 3. Validate 10-digit Indian mobile format
     mobile_clean = reg_in.mobile.strip()
     if not re.match(r"^[6-9]\d{9}$", mobile_clean):
         raise HTTPException(status_code=400, detail="Please provide a valid 10-digit Indian mobile number.")
 
     clean_email = str(reg_in.email).strip().lower()
 
-    # Check for existing email
+    # 4. Enforce account uniqueness
     existing_email = db.query(Complainant).filter(Complainant.email == clean_email).first()
     if existing_email:
-        raise HTTPException(status_code=400, detail="An account with this email address already exists.")
+        raise HTTPException(status_code=400, detail="An account with this email address already exists. Please login instead.")
 
-    # Check for existing mobile
     existing_mobile = db.query(Complainant).filter(Complainant.mobile == mobile_clean).first()
     if existing_mobile:
-        raise HTTPException(status_code=400, detail="An account with this mobile number already exists.")
+        raise HTTPException(status_code=400, detail="An account with this mobile number already exists. Please login instead.")
 
-    # STRICT SECURITY RULE: Role is assigned exclusively by trusted backend logic
+    # 5. STRICT SECURITY: Role is assigned exclusively by trusted backend logic
     new_complainant = Complainant(
         full_name=reg_in.full_name.strip(),
         email=clean_email,
@@ -128,11 +150,8 @@ def register_complainant(
 
     return new_complainant
 
-@router.post("/login", response_model=ComplainantToken)
-def login_complainant(
-    login_in: ComplainantLogin,
-    db: Session = Depends(get_db)
-):
+
+def _handle_login(login_in: ComplainantLogin, db: Session) -> Dict[str, Any]:
     clean_identifier = login_in.email.strip().lower()
     complainant = db.query(Complainant).filter(
         (Complainant.email == clean_identifier) | (Complainant.mobile == clean_identifier)
@@ -144,8 +163,12 @@ def login_complainant(
             detail="Incorrect email/mobile or password",
         )
 
+    # Inactive / suspended account handling
     if not complainant.is_active:
-        raise HTTPException(status_code=400, detail="Account is deactivated")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your complainant account has been suspended or deactivated. Please contact support."
+        )
 
     token = create_complainant_token(complainant)
 
@@ -173,13 +196,36 @@ def login_complainant(
     }
     return {"access_token": token, "token_type": "bearer", "complainant": complainant_dict}
 
+
+# Primary Routes (POST /api/complainant/register, POST /api/complainant/login, GET /api/complainant/me)
+@router.post("/register", response_model=ComplainantResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/auth/register", response_model=ComplainantResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+def register_complainant(
+    reg_in: ComplainantRegister,
+    db: Session = Depends(get_db)
+):
+    return _handle_registration(reg_in, db)
+
+
+@router.post("/login", response_model=ComplainantToken)
+@router.post("/auth/login", response_model=ComplainantToken, include_in_schema=False)
+def login_complainant(
+    login_in: ComplainantLogin,
+    db: Session = Depends(get_db)
+):
+    return _handle_login(login_in, db)
+
+
 @router.get("/me", response_model=ComplainantResponse)
+@router.get("/auth/me", response_model=ComplainantResponse, include_in_schema=False)
 def get_current_complainant_profile(
     current_complainant: Complainant = Depends(get_current_complainant)
 ):
     return current_complainant
 
+
 @router.post("/demo-login", response_model=ComplainantToken)
+@router.post("/auth/demo-login", response_model=ComplainantToken, include_in_schema=False)
 def demo_complainant_login(db: Session = Depends(get_db)):
     """
     Dedicated development quick-switch for evaluating the complainant portal.

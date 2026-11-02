@@ -5,7 +5,7 @@ import jwt
 from app.main import app
 from app.config import settings
 from app.database import SessionLocal
-from app.models.models import Institution
+from app.models.models import Institution, Complainant
 from app.seed_data import seed_complainants
 
 client = TestClient(app)
@@ -30,7 +30,7 @@ TEST_B_PASSWORD = "PasswordB123"
 
 def test_phase3_complainant_registration_validation():
     # 1. Reject invalid 10-digit mobile number
-    bad_mobile_res = client.post("/api/complainant/auth/register", json={
+    bad_mobile_res = client.post("/api/complainant/register", json={
         "full_name": "Test Citizen",
         "email": "invalid.mobile@example.com",
         "mobile": "12345",  # Invalid format
@@ -42,7 +42,7 @@ def test_phase3_complainant_registration_validation():
     assert "valid 10-digit" in bad_mobile_res.json()["detail"]
 
     # 2. Reject password mismatch
-    mismatch_res = client.post("/api/complainant/auth/register", json={
+    mismatch_res = client.post("/api/complainant/register", json={
         "full_name": "Test Citizen",
         "email": "mismatch@example.com",
         "mobile": "9876543210",
@@ -54,7 +54,7 @@ def test_phase3_complainant_registration_validation():
     assert "do not match" in mismatch_res.json()["detail"]
 
     # 3. Successful registration with valid data
-    reg_res = client.post("/api/complainant/auth/register", json={
+    reg_res = client.post("/api/complainant/register", json={
         "full_name": "Pooja Sharma",
         "email": TEST_EMAIL,
         "mobile": TEST_MOBILE,
@@ -70,7 +70,7 @@ def test_phase3_complainant_registration_validation():
     assert reg_data["complainant_type"] == "Student"
 
     # 4. Reject duplicate registration (same email / mobile)
-    dup_res = client.post("/api/complainant/auth/register", json={
+    dup_res = client.post("/api/complainant/register", json={
         "full_name": "Pooja Sharma Duplicate",
         "email": TEST_EMAIL,
         "mobile": TEST_MOBILE,
@@ -84,7 +84,7 @@ def test_phase3_complainant_registration_validation():
 
 def test_phase3_complainant_login_and_token_claims():
     # 1. Login as registered complainant
-    login_res = client.post("/api/complainant/auth/login", json={
+    login_res = client.post("/api/complainant/login", json={
         "email": TEST_EMAIL,
         "password": TEST_PASSWORD
     })
@@ -102,16 +102,16 @@ def test_phase3_complainant_login_and_token_claims():
     assert payload["aud"] == "nyayaniti-complainant"
     assert payload["token_type"] == "complainant_access"
 
-    # 3. Check /complainant/auth/me returns complainant identity
+    # 3. Check /complainant/me returns complainant identity
     headers = {"Authorization": f"Bearer {token}"}
-    me_res = client.get("/api/complainant/auth/me", headers=headers)
+    me_res = client.get("/api/complainant/me", headers=headers)
     assert me_res.status_code == 200
     assert me_res.json()["email"] == TEST_EMAIL
 
 
 def test_phase3_demo_complainant_login():
     # Verify pre-seeded demo complainant login works
-    demo_res = client.post("/api/complainant/auth/demo-login")
+    demo_res = client.post("/api/complainant/demo-login")
     assert demo_res.status_code == 200
     demo_data = demo_res.json()
     assert "access_token" in demo_data
@@ -122,9 +122,54 @@ def test_phase3_demo_complainant_login():
     assert payload["role"] == "complainant"
 
 
+def test_phase3_inactive_complainant_handling():
+    # Register an account to deactivate
+    inactive_email = f"inactive.{uuid.uuid4().hex[:6]}@test.in"
+    inactive_mobile = f"96{uuid.uuid4().int % 100000000:08d}"
+    reg_res = client.post("/api/complainant/register", json={
+        "full_name": "Suspended Citizen",
+        "email": inactive_email,
+        "mobile": inactive_mobile,
+        "password": "Password123!",
+        "confirm_password": "Password123!",
+        "complainant_type": "Citizen"
+    })
+    assert reg_res.status_code == 201
+
+    # Login to acquire token while active
+    login_res = client.post("/api/complainant/login", json={
+        "email": inactive_email,
+        "password": "Password123!"
+    })
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Deactivate account in database
+    db = SessionLocal()
+    try:
+        comp = db.query(Complainant).filter(Complainant.email == inactive_email).first()
+        comp.is_active = False
+        db.commit()
+    finally:
+        db.close()
+
+    # 1. Login attempt must return HTTP 403 Forbidden
+    blocked_login = client.post("/api/complainant/login", json={
+        "email": inactive_email,
+        "password": "Password123!"
+    })
+    assert blocked_login.status_code == 403
+    assert "suspended or deactivated" in blocked_login.json()["detail"].lower()
+
+    # 2. Existing token on /me must be rejected with HTTP 403 Forbidden
+    blocked_me = client.get("/api/complainant/me", headers=headers)
+    assert blocked_me.status_code == 403
+    assert "suspended or deactivated" in blocked_me.json()["detail"].lower()
+
+
 def test_phase3_token_isolation_complainant_blocked_from_officer_apis():
     # Acquire complainant token
-    login_res = client.post("/api/complainant/auth/login", json={
+    login_res = client.post("/api/complainant/login", json={
         "email": TEST_EMAIL,
         "password": TEST_PASSWORD
     })
@@ -151,65 +196,5 @@ def test_phase3_token_isolation_officer_blocked_from_complainant_apis():
     headers = {"Authorization": f"Bearer {officer_token}"}
 
     # Attempt to call complainant endpoints with officer token
-    comp_cases_res = client.get("/api/complainant/cases", headers=headers)
-    assert comp_cases_res.status_code in [401, 403], "Officer token MUST be blocked from /api/complainant/cases"
-
-
-def test_phase3_complainant_grievance_filing_and_ownership_scoping():
-    # Login as citizen A
-    comp_login = client.post("/api/complainant/auth/login", json={
-        "email": TEST_EMAIL,
-        "password": TEST_PASSWORD
-    })
-    comp_token = comp_login.json()["access_token"]
-    comp_headers = {"Authorization": f"Bearer {comp_token}"}
-
-    # Find a valid institution
-    db = SessionLocal()
-    try:
-        inst = db.query(Institution).first()
-        inst_id = inst.id
-    finally:
-        db.close()
-
-    # File a new grievance as Citizen A
-    file_res = client.post("/api/complainant/cases", headers=comp_headers, json={
-        "institution_id": inst_id,
-        "category": "Fee Overcharging & Refund Denial",
-        "description": "Institution demanding unapproved excess lab deposits and refusing fee refund upon student admission cancellation."
-    })
-    assert file_res.status_code == 201
-    case_data = file_res.json()
-    case_id = case_data["id"]
-    assert case_id.startswith("AICTE-PGRC-")
-    assert case_data["status"] == "Pending"
-
-    # Verify Citizen A can view their case detail with milestones
-    detail_res = client.get(f"/api/complainant/cases/{case_id}", headers=comp_headers)
-    assert detail_res.status_code == 200
-    detail_data = detail_res.json()
-    assert detail_data["id"] == case_id
-    assert len(detail_data["events"]) >= 1
-    assert "priority_score" not in detail_data, "Internal priority score must NOT leak to complainant"
-
-    # Register Citizen B
-    reg_b = client.post("/api/complainant/auth/register", json={
-        "full_name": "Citizen B",
-        "email": TEST_B_EMAIL,
-        "mobile": TEST_B_MOBILE,
-        "password": TEST_B_PASSWORD,
-        "confirm_password": TEST_B_PASSWORD,
-        "complainant_type": "Student"
-    })
-    assert reg_b.status_code == 201
-
-    b_login = client.post("/api/complainant/auth/login", json={
-        "email": TEST_B_EMAIL,
-        "password": TEST_B_PASSWORD
-    })
-    b_token = b_login.json()["access_token"]
-    b_headers = {"Authorization": f"Bearer {b_token}"}
-
-    # ANTI-IDOR VERIFICATION: Citizen B attempts to access Citizen A's case
-    b_access_res = client.get(f"/api/complainant/cases/{case_id}", headers=b_headers)
-    assert b_access_res.status_code == 404, "Cross-complainant case access MUST return 404 Not Found"
+    comp_me_res = client.get("/api/complainant/me", headers=headers)
+    assert comp_me_res.status_code in [401, 403], "Officer token MUST be blocked from /api/complainant/me"

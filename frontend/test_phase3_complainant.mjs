@@ -49,10 +49,8 @@ assert(
   apiContent.includes('complainantRegister') &&
   apiContent.includes('complainantLogin') &&
   apiContent.includes('complainantDemoLogin') &&
-  apiContent.includes('getComplainantCases') &&
-  apiContent.includes('getComplainantCaseDetail') &&
-  apiContent.includes('fileComplainantCase'),
-  'api.ts exports all 6 dedicated citizen API methods'
+  apiContent.includes('getComplainantMe'),
+  'api.ts exports all required citizen authentication API methods'
 );
 
 // --------------------------------------------------------------------
@@ -105,10 +103,10 @@ const appContent = fs.readFileSync(appPath, 'utf8');
 assert(appContent.includes('ComplainantAuthProvider'), 'App.tsx wraps app tree with ComplainantAuthProvider');
 assert(appContent.includes('path="/complainant/login"'), 'App.tsx mounts route /complainant/login');
 assert(appContent.includes('path="/complainant/register"'), 'App.tsx mounts route /complainant/register');
-assert(appContent.includes('path="/complainant/dashboard"'), 'App.tsx mounts route /complainant/dashboard');
+assert(appContent.includes('path="/complainant/home"'), 'App.tsx mounts route /complainant/home');
 assert(
-  appContent.includes('<ComplainantProtectedRoute>') && appContent.includes('ComplainantDashboardPage'),
-  'App.tsx wraps /complainant/dashboard with ComplainantProtectedRoute'
+  appContent.includes('<ComplainantProtectedRoute>') && appContent.includes('ComplainantHomePage'),
+  'App.tsx wraps /complainant/home with ComplainantProtectedRoute'
 );
 
 // --------------------------------------------------------------------
@@ -158,23 +156,28 @@ assert(
   'ComplainantLoginPage provides link to register new citizen account'
 );
 
-// --------------------------------------------------------------------
-// 6. CITIZEN DASHBOARD & GRIEVANCE TRACKING
-// --------------------------------------------------------------------
-console.log('\n--- PART 6: CITIZEN DASHBOARD & MILESTONE TRACKING ---');
+assert(
+  loginContent.includes('/complainant/home'),
+  'ComplainantLoginPage redirects authenticated citizens to /complainant/home'
+);
 
-const dashPagePath = path.join(__dirname, 'src', 'pages', 'ComplainantDashboardPage.tsx');
-assert(fs.existsSync(dashPagePath), 'ComplainantDashboardPage.tsx exists');
-const dashContent = fs.readFileSync(dashPagePath, 'utf8');
+// --------------------------------------------------------------------
+// 6. CITIZEN HOME PLACEHOLDER (PHASE 3 SCOPE)
+// --------------------------------------------------------------------
+console.log('\n--- PART 6: CITIZEN HOME PLACEHOLDER ---');
+
+const homePagePath = path.join(__dirname, 'src', 'pages', 'ComplainantHomePage.tsx');
+assert(fs.existsSync(homePagePath), 'ComplainantHomePage.tsx exists');
+const homeContent = fs.readFileSync(homePagePath, 'utf8');
 
 assert(
-  dashContent.includes('expandedCaseId') && dashContent.includes('caseDetail'),
-  'ComplainantDashboardPage renders case milestone progression timeline'
+  homeContent.includes('complainant') && homeContent.includes('logout'),
+  'ComplainantHomePage presents citizen profile information and logout action'
 );
 
 assert(
-  dashContent.includes('showFileModal') && dashContent.includes('fileComplainantCase'),
-  'ComplainantDashboardPage includes citizen grievance submission modal'
+  homeContent.includes('Phase 4') || homeContent.includes('Grievance Submission'),
+  'ComplainantHomePage clearly articulates Phase 4 roadmap for full grievance tracking'
 );
 
 // --------------------------------------------------------------------

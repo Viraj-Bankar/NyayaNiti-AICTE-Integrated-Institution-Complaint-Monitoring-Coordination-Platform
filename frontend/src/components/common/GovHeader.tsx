@@ -18,8 +18,8 @@ export const GovHeader: React.FC = () => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
-  // If in protected complainant dashboard, ComplainantHeader is rendered inside the view
-  if (location.pathname.startsWith('/complainant/dashboard')) {
+  // If in protected complainant portal, ComplainantHeader is rendered inside the view
+  if (location.pathname.startsWith('/complainant/home') || location.pathname.startsWith('/complainant/dashboard')) {
     return null;
   }
 

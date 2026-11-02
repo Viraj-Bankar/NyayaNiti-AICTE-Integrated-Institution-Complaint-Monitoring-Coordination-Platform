@@ -255,3 +255,4 @@ export const ComplainantRegisterPage: React.FC = () => {
 };
 
 export default ComplainantRegisterPage;
+

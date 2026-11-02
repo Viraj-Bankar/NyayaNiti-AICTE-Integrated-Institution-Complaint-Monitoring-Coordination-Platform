@@ -27,6 +27,7 @@ import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ComplainantLoginPage } from './pages/ComplainantLoginPage';
 import { ComplainantRegisterPage } from './pages/ComplainantRegisterPage';
+import { ComplainantHomePage } from './pages/ComplainantHomePage';
 import { ComplainantDashboardPage } from './pages/ComplainantDashboardPage';
 
 /**
@@ -74,10 +75,18 @@ export const App: React.FC = () => {
                 <Route path="/complainant/login" element={<ComplainantLoginPage />} />
                 <Route path="/complainant/register" element={<ComplainantRegisterPage />} />
                 <Route
+                  path="/complainant/home"
+                  element={
+                    <ComplainantProtectedRoute>
+                      <ComplainantHomePage />
+                    </ComplainantProtectedRoute>
+                  }
+                />
+                <Route
                   path="/complainant/dashboard"
                   element={
                     <ComplainantProtectedRoute>
-                      <ComplainantDashboardPage />
+                      <ComplainantHomePage />
                     </ComplainantProtectedRoute>
                   }
                 />
