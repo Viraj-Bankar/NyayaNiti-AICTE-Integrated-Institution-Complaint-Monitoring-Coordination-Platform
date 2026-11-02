@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.database import engine, Base, SessionLocal, ensure_schema
+from app.database import engine, Base, SessionLocal, ensure_schema, ensure_schema
 from app.api import (
     auth, institutions, cases, overlaps, action_conflicts,
     coordination, dashboard, surges, reports, notifications,
@@ -31,9 +31,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Startup event to seed database if empty
+# Startup event to ensure schema migrations and seed database if empty
 @app.on_event("startup")
 def on_startup():
+    ensure_schema()
     db = SessionLocal()
     try:
         seed_database(db)
