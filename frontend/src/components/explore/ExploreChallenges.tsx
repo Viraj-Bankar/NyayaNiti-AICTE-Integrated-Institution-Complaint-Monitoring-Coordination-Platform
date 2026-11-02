@@ -1,128 +1,120 @@
 import React from 'react';
-import { Layers, GitMerge, AlertTriangle, Building2, Clock, FileSearch } from 'lucide-react';
+import { FileStack, Network, Clock, Building2, RefreshCw, AlertCircle } from 'lucide-react';
 
 export const ExploreChallenges: React.FC = () => {
+  const challenges = [
+    {
+      id: '01',
+      title: 'Complaint Duplication',
+      icon: FileStack,
+      tag: 'Duplicate Representations',
+      description:
+        'Similar complaints may reach different bureaus independently through varied intake channels, public grievances, and direct representations without unified correlation.',
+    },
+    {
+      id: '02',
+      title: 'Fragmented Operations',
+      icon: Network,
+      tag: 'Isolated Bureau Silos',
+      description:
+        'Different teams may handle related cases without shared visibility, resulting in compartmentalized reviews and incomplete awareness of concurrent administrative proceedings.',
+    },
+    {
+      id: '03',
+      title: 'Delayed Coordination',
+      icon: Clock,
+      tag: 'Communication Latency',
+      description:
+        'Cross-bureau communication can delay action when inter-office memos and formal inquiries are required just to confirm whether another desk has initiated action.',
+    },
+    {
+      id: '04',
+      title: 'Institution Visibility',
+      icon: Building2,
+      tag: 'Scattered Records',
+      description:
+        'Institution-related complaint history may be scattered across distinct files and databases, preventing officers from viewing an institution’s comprehensive 360-degree compliance record.',
+    },
+    {
+      id: '05',
+      title: 'Repeated Work',
+      icon: RefreshCw,
+      tag: 'Redundant Inquiries',
+      description:
+        'Overlapping cases can lead to redundant investigation, duplicated committee hearings, and repeated follow-ups regarding the same underlying campus dispute.',
+    },
+  ];
+
   return (
-    <section id="challenges" className="py-14 px-4 bg-[#F4F6F9] border-b border-slate-200">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="text-center max-w-2xl mx-auto space-y-2">
-          <span className="text-xs font-bold text-[#C62828] uppercase tracking-wider bg-red-50 px-2.5 py-1 rounded border border-red-200">
-            Operational Vulnerabilities
+    <section id="challenges" className="py-14 sm:py-16 px-4 bg-[#F4F6F9] border-b border-slate-200">
+      <div className="max-w-7xl mx-auto space-y-10">
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto space-y-2.5">
+          <span className="text-xs font-bold text-[#C62828] uppercase tracking-wider bg-red-50 px-3 py-1 rounded border border-red-200">
+            The Problem
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-[#061E46]">
-            Why a Unified Monitoring System Matters
+          <h2 className="text-2xl sm:text-3xl font-black text-[#061E46] tracking-tight">
+            Challenges in Decentralized Complaint Governance
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            Six critical administrative challenges that arise when institutional grievance management operates across isolated departmental silos.
+          <p className="text-sm text-slate-600 leading-relaxed max-w-2xl mx-auto">
+            When institutional grievances are processed across isolated departmental desks, administrative inefficiencies and blind spots inevitably arise.
           </p>
         </div>
 
+        {/* 5 Professional Problem Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {/* Card 1 */}
-          <div className="bg-white rounded-lg p-5 border-t-4 border-[#092D62] border-x border-b border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#092D62] flex items-center justify-center">
-                <Layers className="w-5 h-5" />
-              </div>
-              <h3 className="text-sm font-bold text-[#061E46]">
-                1. Fragmented Information
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Complaints regarding the same college or university are scattered across distinct databases, intake desks, and emails, preventing authorities from observing overall compliance health.
-              </p>
-            </div>
-            <div className="pt-3 mt-4 border-t border-slate-100 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Isolated Records
-            </div>
-          </div>
+          {challenges.map((c) => {
+            const Icon = c.icon;
+            return (
+              <div
+                key={c.id}
+                className="bg-white rounded-xl p-5 sm:p-6 border border-slate-200 shadow-2xs hover:border-[#092D62] hover:shadow-md transition-all flex flex-col justify-between group"
+              >
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-lg bg-[#092D62] text-[#FFB900] flex items-center justify-center font-bold transition-transform group-hover:scale-105">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-mono font-bold text-slate-400 group-hover:text-[#092D62] transition-colors">
+                      {c.id}
+                    </span>
+                  </div>
 
-          {/* Card 2 */}
-          <div className="bg-white rounded-lg p-5 border-t-4 border-[#FFB900] border-x border-b border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-50 text-[#B8860B] flex items-center justify-center">
-                <GitMerge className="w-5 h-5" />
-              </div>
-              <h3 className="text-sm font-bold text-[#061E46]">
-                2. Repeated Investigation
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Multiple bureaus examine parallel representations filed by faculty and student unions regarding identical disputes, resulting in duplicated hearings and wasted officer hours.
-              </p>
-            </div>
-            <div className="pt-3 mt-4 border-t border-slate-100 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Redundant Inquiries
-            </div>
-          </div>
+                  <h3 className="text-sm sm:text-base font-bold text-[#061E46]">
+                    {c.title}
+                  </h3>
 
-          {/* Card 3 */}
-          <div className="bg-white rounded-lg p-5 border-t-4 border-[#C62828] border-x border-b border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-red-50 text-[#C62828] flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <h3 className="text-sm font-bold text-[#061E46]">
-                3. Coordination Gaps
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                One bureau may issue a closure order or compliance certificate while another department actively schedules an on-site fact-finding inquiry for the same academic session.
-              </p>
-            </div>
-            <div className="pt-3 mt-4 border-t border-slate-100 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Contradictory Rulings
-            </div>
-          </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {c.description}
+                  </p>
+                </div>
 
-          {/* Card 4 */}
-          <div className="bg-white rounded-lg p-5 border-t-4 border-[#25B8BD] border-x border-b border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-teal-50 text-[#25B8BD] flex items-center justify-center">
-                <Building2 className="w-5 h-5" />
+                <div className="pt-3.5 mt-4 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                  <span className="text-[10px] font-bold text-[#092D62] uppercase tracking-wider bg-blue-50/70 px-2 py-0.5 rounded border border-blue-100">
+                    {c.tag}
+                  </span>
+                </div>
               </div>
-              <h3 className="text-sm font-bold text-[#061E46]">
-                4. Limited Institutional Insights
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Difficulty in detecting recurring institutional non-compliance patterns across years, including recurrent faculty shortages, unauthorized shifts, or infrastructure deficits.
-              </p>
-            </div>
-            <div className="pt-3 mt-4 border-t border-slate-100 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Lack of Pattern Detection
-            </div>
-          </div>
+            );
+          })}
 
-          {/* Card 5 */}
-          <div className="bg-white rounded-lg p-5 border-t-4 border-[#1E5AA8] border-x border-b border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+          {/* Contextual Institutional Impact Callout Card */}
+          <div className="bg-gradient-to-br from-[#061E46] to-[#092D62] text-white rounded-xl p-5 sm:p-6 border border-slate-700 shadow-sm flex flex-col justify-between">
             <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#1E5AA8] flex items-center justify-center">
-                <Clock className="w-5 h-5" />
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FFB900] uppercase tracking-wider">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>Institutional Consequence</span>
               </div>
-              <h3 className="text-sm font-bold text-[#061E46]">
-                5. Delayed Administrative Awareness
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                Contradictory Directives & Loss of Trust
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Critical institutional escalations may languish at junior appraisal levels without senior leadership receiving consolidated risk notifications prior to statutory deadlines.
+              <p className="text-xs text-slate-200 leading-relaxed">
+                Without cross-bureau coordination, one department may issue a show-cause or inspection notice while another desk grants approval, compromising regulatory consistency.
               </p>
             </div>
-            <div className="pt-3 mt-4 border-t border-slate-100 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Escalation Delays
-            </div>
-          </div>
 
-          {/* Card 6 */}
-          <div className="bg-white rounded-lg p-5 border-t-4 border-[#7B1FA2] border-x border-b border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-50 text-[#7B1FA2] flex items-center justify-center">
-                <FileSearch className="w-5 h-5" />
-              </div>
-              <h3 className="text-sm font-bold text-[#061E46]">
-                6. Limited Historical Context
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Officers evaluating a new complaint have limited means to cross-reference historical show-cause notices, previous inspection minutes, and compliance undertakings filed earlier.
-              </p>
-            </div>
-            <div className="pt-3 mt-4 border-t border-slate-100 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Missing Compliance Lineage
+            <div className="pt-3.5 mt-4 border-t border-slate-700/80 text-[10px] text-amber-200/90 font-medium">
+              Solved by NyayaNiti’s Convergence Engine
             </div>
           </div>
         </div>

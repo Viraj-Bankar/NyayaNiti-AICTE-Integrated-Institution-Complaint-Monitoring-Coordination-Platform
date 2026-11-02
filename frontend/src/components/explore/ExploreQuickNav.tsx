@@ -13,8 +13,8 @@ interface QuickNavItem {
 const NAV_ITEMS: QuickNavItem[] = [
   { id: 'hero', label: 'Overview', icon: Compass },
   { id: 'about', label: 'About', icon: Info },
-  { id: 'challenges', label: 'Challenges', icon: AlertTriangle },
-  { id: 'vision', label: 'Architecture', icon: Layers },
+  { id: 'challenges', label: 'The Problem', icon: AlertTriangle },
+  { id: 'vision', label: 'Our Solution', icon: Layers },
   { id: 'capabilities', label: 'Capabilities', icon: Cpu },
   { id: 'ai-technology', label: 'AI & ML', icon: Sparkles },
   { id: 'how-it-works', label: 'How It Works', icon: CheckCircle2 },
