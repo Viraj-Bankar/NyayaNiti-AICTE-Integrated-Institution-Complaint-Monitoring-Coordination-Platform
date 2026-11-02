@@ -72,6 +72,22 @@ assert(
   'ComplainantAuthContext exports dedicated useComplainantAuth hook'
 );
 
+// Verify isolated logout in ComplainantAuthContext
+assert(
+  compAuthContent.includes('removeItem(\'nyayaniti_complainant_token\')') &&
+  !compAuthContent.includes('removeItem(\'nyayaniti_token\')'),
+  'Complainant logout does not remove or modify officer session token'
+);
+
+// Verify isolated logout in AuthContext
+const officerAuthContextPath = path.join(__dirname, 'src', 'context', 'AuthContext.tsx');
+const officerAuthContent = fs.readFileSync(officerAuthContextPath, 'utf8');
+assert(
+  officerAuthContent.includes('removeItem(\'nyayaniti_token\')') &&
+  !officerAuthContent.includes('removeItem(\'nyayaniti_complainant_token\')'),
+  'Officer logout does not remove or modify complainant session token'
+);
+
 const compProtectedRoutePath = path.join(__dirname, 'src', 'components', 'common', 'ComplainantProtectedRoute.tsx');
 assert(fs.existsSync(compProtectedRoutePath), 'ComplainantProtectedRoute.tsx exists');
 const compProtectedContent = fs.readFileSync(compProtectedRoutePath, 'utf8');
@@ -83,6 +99,10 @@ assert(
 assert(
   compProtectedContent.includes('to="/complainant/login"'),
   'ComplainantProtectedRoute strictly redirects unauthenticated citizens to /complainant/login'
+);
+assert(
+  compProtectedContent.includes('to="/dashboard"'),
+  'ComplainantProtectedRoute strictly redirects officers to /dashboard'
 );
 
 const officerProtectedRoutePath = path.join(__dirname, 'src', 'components', 'common', 'ProtectedRoute.tsx');
@@ -119,11 +139,11 @@ assert(fs.existsSync(regPagePath), 'ComplainantRegisterPage.tsx exists');
 const regContent = fs.readFileSync(regPagePath, 'utf8');
 
 assert(
-  regContent.includes('full_name') &&
+  regContent.includes('fullName') &&
   regContent.includes('email') &&
   regContent.includes('mobile') &&
   regContent.includes('password') &&
-  regContent.includes('confirm_password'),
+  regContent.includes('confirmPassword'),
   'ComplainantRegisterPage includes all required registration fields'
 );
 
@@ -133,8 +153,13 @@ assert(
 );
 
 assert(
-  regContent.includes('password') && regContent.includes('confirm_password') && regContent.includes('match'),
+  regContent.includes('password') && regContent.includes('confirmPassword') && regContent.includes('match'),
   'ComplainantRegisterPage enforces password match confirmation'
+);
+
+assert(
+  regContent.includes('showPassword') && regContent.includes('showConfirmPassword'),
+  'ComplainantRegisterPage includes password visibility controls'
 );
 
 // --------------------------------------------------------------------
@@ -159,6 +184,11 @@ assert(
 assert(
   loginContent.includes('/complainant/home'),
   'ComplainantLoginPage redirects authenticated citizens to /complainant/home'
+);
+
+assert(
+  loginContent.includes('showPassword'),
+  'ComplainantLoginPage includes password visibility control'
 );
 
 // --------------------------------------------------------------------
@@ -189,8 +219,28 @@ const pubHeaderPath = path.join(__dirname, 'src', 'components', 'common', 'Publi
 const pubHeaderContent = fs.readFileSync(pubHeaderPath, 'utf8');
 
 assert(
-  pubHeaderContent.includes('/complainant/login') && pubHeaderContent.includes('Citizen Portal'),
-  'PublicHeader includes prominent "Citizen Portal" CTA navigating to /complainant/login'
+  pubHeaderContent.includes('/complainant/login') &&
+  (pubHeaderContent.includes('Track Your Complaint') || pubHeaderContent.includes('Complainant Login')),
+  'PublicHeader includes prominent "Track Your Complaint" / "Complainant Login" entry'
+);
+
+assert(
+  pubHeaderContent.includes('/login') && pubHeaderContent.includes('Officer'),
+  'PublicHeader preserves official Officer Login CTA'
+);
+
+const heroPath = path.join(__dirname, 'src', 'components', 'explore', 'ExploreHero.tsx');
+const heroContent = fs.readFileSync(heroPath, 'utf8');
+assert(
+  heroContent.includes('/complainant/login') && heroContent.includes('Track Your Complaint'),
+  'ExploreHero includes visible "Track Your Complaint" CTA'
+);
+
+const ctaPath = path.join(__dirname, 'src', 'components', 'explore', 'ExploreCTA.tsx');
+const ctaContent = fs.readFileSync(ctaPath, 'utf8');
+assert(
+  ctaContent.includes('/complainant/login') && ctaContent.includes('Track Your Complaint'),
+  'ExploreCTA includes visible "Track Your Complaint" CTA'
 );
 
 const compHeaderPath = path.join(__dirname, 'src', 'components', 'common', 'ComplainantHeader.tsx');
@@ -200,6 +250,14 @@ const compHeaderContent = fs.readFileSync(compHeaderPath, 'utf8');
 assert(
   compHeaderContent.includes('complainant') && compHeaderContent.includes('logout'),
   'ComplainantHeader provides citizen identity presentation and logout capability'
+);
+
+// Check that GovNavBar returns null when non-officer
+const govNavBarPath = path.join(__dirname, 'src', 'components', 'common', 'GovNavBar.tsx');
+const govNavBarContent = fs.readFileSync(govNavBarPath, 'utf8');
+assert(
+  govNavBarContent.includes('if (isLoading || !isAuthenticated || !user) {\n    return null;\n  }'),
+  'GovNavBar returns null for non-officers (no internal officer navigation leaked to complainants)'
 );
 
 console.log('\n======================================================================');

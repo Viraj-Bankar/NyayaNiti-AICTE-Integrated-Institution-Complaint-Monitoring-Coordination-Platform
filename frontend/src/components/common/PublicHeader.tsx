@@ -50,16 +50,16 @@ export const PublicHeader: React.FC = () => {
           </div>
         </Link>
 
-        {/* RIGHT: Citizen Portal + Officer Login Buttons */}
+        {/* RIGHT: Complainant Track / Login + Officer Login Buttons */}
         <div className="flex items-center gap-2.5">
           <Link
             to="/complainant/login"
             className="btn-3d-white px-3 sm:px-4 py-2 rounded text-xs tracking-wide font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs text-[#061E46]"
-            title="Citizen Grievance & Tracking Portal"
+            title="Track Your Complaint / Complainant Login"
           >
             <User className="w-3.5 h-3.5 text-[#1E5AA8]" />
-            <span className="hidden sm:inline">Citizen Portal</span>
-            <span className="sm:hidden">Citizen</span>
+            <span className="hidden sm:inline">Track Your Complaint</span>
+            <span className="sm:hidden">Complainant Login</span>
           </Link>
 
           <Link

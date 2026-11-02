@@ -1,5 +1,6 @@
 import React from 'react';
-import { Compass, Shield, ArrowUpRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Compass, Shield, ArrowUpRight, User } from 'lucide-react';
 
 interface ExploreCTAProps {
   onLoginClick: () => void;
@@ -22,11 +23,19 @@ export const ExploreCTA: React.FC<ExploreCTAProps> = ({ onLoginClick }) => {
         </p>
 
         <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
-          <button
-            onClick={onLoginClick}
+          <Link
+            to="/complainant/login"
             className="btn-3d-amber px-6 py-3 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md"
           >
-            <Shield className="w-4 h-4" />
+            <User className="w-4 h-4 text-[#061E46]" />
+            <span>Track Your Complaint</span>
+          </Link>
+
+          <button
+            onClick={onLoginClick}
+            className="btn-3d-white px-6 py-3 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md"
+          >
+            <Shield className="w-4 h-4 text-[#092D62]" />
             <span>Officer Login</span>
           </button>
 
@@ -34,10 +43,10 @@ export const ExploreCTA: React.FC<ExploreCTAProps> = ({ onLoginClick }) => {
             onClick={() => {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="btn-3d-white px-6 py-3 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md"
+            className="px-5 py-3 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md bg-white/10 hover:bg-white/20 text-white border border-white/25 transition-all"
           >
             <span>Back to Top</span>
-            <ArrowUpRight className="w-4 h-4 text-[#092D62]" />
+            <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
       </div>

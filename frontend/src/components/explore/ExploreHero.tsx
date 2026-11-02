@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import {
   Compass,
   ArrowRight,
@@ -7,6 +8,7 @@ import {
   GitMerge,
   ShieldCheck,
   CheckCircle2,
+  User,
 } from 'lucide-react';
 
 interface ExploreHeroProps {
@@ -55,6 +57,14 @@ export const ExploreHero: React.FC<ExploreHeroProps> = ({ onExploreClick, onLogi
               <span>Explore Platform</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+
+            <Link
+              to="/complainant/login"
+              className="px-5 py-3 rounded text-xs tracking-wide font-bold flex items-center gap-2 cursor-pointer shadow-md bg-white/10 hover:bg-white/20 text-white border border-white/25 transition-all"
+            >
+              <User className="w-4 h-4 text-[#FFB900]" />
+              <span>Track Your Complaint</span>
+            </Link>
 
             <button
               onClick={onLoginClick}

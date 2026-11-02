@@ -18,7 +18,10 @@ export const ComplainantLoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/complainant/home';
+  const rawFrom = (location.state as { from?: { pathname?: string } })?.from?.pathname;
+  const destination = (rawFrom && rawFrom !== '/complainant/login' && rawFrom !== '/complainant/register')
+    ? rawFrom
+    : '/complainant/home';
 
   React.useEffect(() => {
     if (isAuthenticated) {
