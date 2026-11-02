@@ -114,6 +114,7 @@ class Case(Base):
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False, index=True)
     complainant_type = Column(String(50), default="Student")  # 'Student', 'Faculty', 'Parent', 'Anonymous', 'Public'
     complainant_masked = Column(String(100), nullable=True)  # Privacy protected identifier
+    title = Column(String(250), nullable=True)  # Grievance Title / Subject
     category = Column(String(100), index=True, nullable=False)  # 'Faculty Irregularity', 'Fee Overcharging', etc.
     subcategory = Column(String(100), nullable=True)
     description = Column(Text, nullable=False)
@@ -160,6 +161,7 @@ class CaseEvent(Base):
     previous_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
     remarks = Column(Text, nullable=True)
+    is_public = Column(Boolean, default=True)  # True for public citizen milestone, False for confidential officer notes
     document_ref = Column(String(300), nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     
@@ -324,8 +326,9 @@ class Notification(Base):
     __tablename__ = "notifications"
     
     id = Column(Integer, primary_key=True, index=True)
-    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # Null = broadcast to relevant officers
-    notification_type = Column(String(100), nullable=False, index=True)  # 'OVERLAP_DETECTED', 'ACTION_CONFLICT', 'DEADLINE_APPROACHING', 'OVERDUE', 'ESCALATION', 'COORDINATION_TASK'
+    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # Null = broadcast to relevant officers or citizen
+    complainant_id = Column(Integer, ForeignKey("complainants.id"), nullable=True, index=True)  # Populated for citizen recipient
+    notification_type = Column(String(100), nullable=False, index=True)  # 'OVERLAP_DETECTED', 'ACTION_CONFLICT', 'DEADLINE_APPROACHING', 'OVERDUE', 'ESCALATION', 'COORDINATION_TASK', 'STATUS_UPDATE', 'INFO_REQUESTED'
     related_case_id = Column(String(100), nullable=True)
     related_entity_type = Column(String(50), nullable=True)
     related_entity_id = Column(String(100), nullable=True)
@@ -343,11 +346,14 @@ class DocumentMetadata(Base):
     id = Column(Integer, primary_key=True, index=True)
     case_id = Column(String(100), ForeignKey("cases.id"), nullable=False, index=True)
     file_name = Column(String(255), nullable=False)
+    original_filename = Column(String(255), nullable=True)
     file_size = Column(Integer, nullable=False)
     file_type = Column(String(50), nullable=False)  # 'pdf', 'docx', 'png', etc.
-    category = Column(String(100), default="Official Notice")  # 'Official Notice', 'Inspection Report', 'Affidavit', 'Action Evidence', 'Correspondence'
+    category = Column(String(100), default="Official Notice")  # 'Official Notice', 'Inspection Report', 'Affidavit', 'Action Evidence', 'Correspondence', 'Fee Receipt'
     access_classification = Column(String(50), default="Official Internal")  # 'Public', 'Official Internal', 'Confidential - Bureau Head Only'
-    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Null if uploaded by citizen
+    uploaded_by_complainant_id = Column(Integer, ForeignKey("complainants.id"), nullable=True, index=True)  # Populated if uploaded by citizen
+    uploader_role = Column(String(50), default="officer")  # 'officer' or 'complainant'
     file_path = Column(String(500), nullable=False)
     upload_timestamp = Column(DateTime, default=datetime.utcnow)
     

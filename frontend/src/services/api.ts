@@ -2,7 +2,9 @@ import {
   User, CaseItem, Institution, OverlapAlert, ActionConflictAlert,
   CoordinationWorkspace, DashboardKpis, AlertTickerItem, NotificationItem,
   AuditLogItem, DocumentItem, Complainant, ComplainantRegisterData,
-  ComplainantCaseItem, ComplainantCaseDetail
+  ComplainantCaseItem, ComplainantCaseDetail, ComplainantInstitutionItem,
+  ComplainantCategoryItem, ComplainantDocumentItem, ComplainantReceipt,
+  ComplainantNotificationItem
 } from '../types';
 
 /**
@@ -77,13 +79,19 @@ async function handleResponse<T>(res: Response): Promise<T> {
   const contentType = res.headers.get('content-type') || '';
   if (!res.ok) {
     if (res.status === 401) {
-      if (onUnauthorizedCallback) {
-        onUnauthorizedCallback();
+      if (res.url.includes('/complainant/')) {
+        localStorage.removeItem('nyayaniti_complainant_token');
+        localStorage.removeItem('nyayaniti_complainant_user');
+        window.dispatchEvent(new CustomEvent('nyayaniti:complainant-session-expired'));
       } else {
-        localStorage.removeItem('nyayaniti_token');
-        localStorage.removeItem('nyayaniti_user');
+        if (onUnauthorizedCallback) {
+          onUnauthorizedCallback();
+        } else {
+          localStorage.removeItem('nyayaniti_token');
+          localStorage.removeItem('nyayaniti_user');
+        }
+        window.dispatchEvent(new CustomEvent('nyayaniti:session-expired'));
       }
-      window.dispatchEvent(new CustomEvent('nyayaniti:session-expired'));
     }
     let errMessage = `HTTP ${res.status}: ${res.statusText}`;
     try {
@@ -507,22 +515,162 @@ export const api = {
     return handleResponse(res);
   },
 
-  async getComplainantCases(): Promise<ComplainantCaseItem[]> {
-    const res = await fetch(`${API_BASE}/complainant/cases`, {
+  async getComplainantCases(params?: { status?: string; q?: string }): Promise<ComplainantCaseItem[]> {
+    const url = buildApiUrl('/complainant/complaints', params);
+    const res = await fetch(url, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantComplaints(params?: {
+    skip?: number;
+    limit?: number;
+    status?: string;
+    category?: string;
+    sort_order?: string;
+    q?: string;
+  }): Promise<ComplainantCaseItem[]> {
+    const url = buildApiUrl('/complainant/complaints', params);
+    const res = await fetch(url, {
       headers: getComplainantAuthHeaders()
     });
     return handleResponse(res);
   },
 
   async getComplainantCaseDetail(caseId: string): Promise<ComplainantCaseDetail> {
-    const res = await fetch(`${API_BASE}/complainant/cases/${caseId}`, {
+    const res = await fetch(`${API_BASE}/complainant/complaints/${caseId}`, {
       headers: getComplainantAuthHeaders()
     });
     return handleResponse(res);
   },
 
-  async fileComplainantCase(payload: { institution_id: number; category: string; subcategory?: string; description: string }): Promise<ComplainantCaseItem> {
-    const res = await fetch(`${API_BASE}/complainant/cases`, {
+  async getComplainantComplaintDetail(complaintId: string): Promise<ComplainantCaseDetail> {
+    const res = await fetch(`${API_BASE}/complainant/complaints/${complaintId}`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantComplaintHistory(complaintId: string): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/complainant/complaints/${complaintId}/history`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async fileComplainantCase(payload: { institution_id: number; title?: string; category: string; subcategory?: string; description: string }): Promise<ComplainantCaseItem> {
+    const res = await fetch(`${API_BASE}/complainant/complaints`, {
+      method: 'POST',
+      headers: getComplainantAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async submitComplainantComplaint(payload: {
+    institution_id: number;
+    title: string;
+    category: string;
+    subcategory?: string;
+    description: string;
+  }): Promise<ComplainantCaseItem> {
+    const res = await fetch(`${API_BASE}/complainant/complaints`, {
+      method: 'POST',
+      headers: getComplainantAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantInstitutions(params?: { q?: string; state?: string }): Promise<ComplainantInstitutionItem[]> {
+    const url = buildApiUrl('/complainant/complaints/institutions', params);
+    const res = await fetch(url, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantCategories(): Promise<ComplainantCategoryItem[]> {
+    const res = await fetch(`${API_BASE}/complainant/complaints/categories`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async uploadComplainantDocument(caseId: string, file: File, category: string = 'Complainant Evidence'): Promise<ComplainantDocumentItem> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('category', category);
+
+    const token = localStorage.getItem('nyayaniti_complainant_token');
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE}/complainant/complaints/${caseId}/documents`, {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantDocuments(caseId: string): Promise<ComplainantDocumentItem[]> {
+    const res = await fetch(`${API_BASE}/complainant/complaints/${caseId}/documents`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantReceipt(caseId: string): Promise<ComplainantReceipt> {
+    const res = await fetch(`${API_BASE}/complainant/complaints/${caseId}/receipt`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  getComplainantDocumentDownloadUrl(complaintId: string, docId: number): string {
+    return `${API_BASE}/complainant/complaints/${complaintId}/documents/${docId}/download`;
+  },
+
+  async getComplainantNotifications(unreadOnly: boolean = false): Promise<ComplainantNotificationItem[]> {
+    const url = buildApiUrl('/complainant/notifications', { unread_only: unreadOnly });
+    const res = await fetch(url, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async markComplainantNotificationRead(id: number): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE}/complainant/notifications/${id}/read`, {
+      method: 'PATCH',
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async markAllComplainantNotificationsRead(): Promise<{ message: string; count: number }> {
+    const res = await fetch(`${API_BASE}/complainant/notifications/mark-all-read`, {
+      method: 'PATCH',
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantUnreadNotifCount(): Promise<{ unread_count: number }> {
+    const res = await fetch(`${API_BASE}/complainant/notifications/unread-count`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async submitComplaintClarification(
+    complaintId: string,
+    payload: { response_text: string; document_id?: number }
+  ): Promise<ComplainantCaseItem> {
+    const res = await fetch(`${API_BASE}/complainant/complaints/${complaintId}/clarification`, {
       method: 'POST',
       headers: getComplainantAuthHeaders(),
       body: JSON.stringify(payload)

@@ -42,7 +42,8 @@ def record_case_event(
     previous_value: str | None = None,
     new_value: str | None = None,
     remarks: str | None = None,
-    document_ref: str | None = None
+    document_ref: str | None = None,
+    is_public: bool = True
 ) -> CaseEvent:
     event = CaseEvent(
         case_id=case_id,
@@ -53,6 +54,7 @@ def record_case_event(
         new_value=new_value,
         remarks=remarks,
         document_ref=document_ref,
+        is_public=is_public,
         timestamp=datetime.utcnow()
     )
     db.add(event)

@@ -29,6 +29,9 @@ import { ComplainantLoginPage } from './pages/ComplainantLoginPage';
 import { ComplainantRegisterPage } from './pages/ComplainantRegisterPage';
 import { ComplainantHomePage } from './pages/ComplainantHomePage';
 import { ComplainantDashboardPage } from './pages/ComplainantDashboardPage';
+import { ComplaintSubmissionPage } from './pages/ComplaintSubmissionPage';
+import { ComplaintHistoryPage } from './pages/ComplaintHistoryPage';
+import { ComplaintDetailPage } from './pages/ComplaintDetailPage';
 
 /**
  * RootRoute:
@@ -78,7 +81,7 @@ export const App: React.FC = () => {
                   path="/complainant/home"
                   element={
                     <ComplainantProtectedRoute>
-                      <ComplainantHomePage />
+                      <ComplainantDashboardPage />
                     </ComplainantProtectedRoute>
                   }
                 />
@@ -86,7 +89,31 @@ export const App: React.FC = () => {
                   path="/complainant/dashboard"
                   element={
                     <ComplainantProtectedRoute>
-                      <ComplainantHomePage />
+                      <ComplainantDashboardPage />
+                    </ComplainantProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/complainant/submit"
+                  element={
+                    <ComplainantProtectedRoute>
+                      <ComplaintSubmissionPage />
+                    </ComplainantProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/complainant/complaints"
+                  element={
+                    <ComplainantProtectedRoute>
+                      <ComplaintHistoryPage />
+                    </ComplainantProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/complainant/complaints/:id"
+                  element={
+                    <ComplainantProtectedRoute>
+                      <ComplaintDetailPage />
                     </ComplainantProtectedRoute>
                   }
                 />
@@ -94,7 +121,15 @@ export const App: React.FC = () => {
                   path="/complainant/cases/:id"
                   element={
                     <ComplainantProtectedRoute>
-                      <ComplainantDashboardPage />
+                      <ComplaintDetailPage />
+                    </ComplainantProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/complainant/profile"
+                  element={
+                    <ComplainantProtectedRoute>
+                      <ComplainantHomePage />
                     </ComplainantProtectedRoute>
                   }
                 />

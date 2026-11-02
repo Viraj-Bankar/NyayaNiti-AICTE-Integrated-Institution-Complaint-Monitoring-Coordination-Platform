@@ -5,12 +5,103 @@ from app.models.models import (
     Bureau, User, Complainant, Institution, InstitutionAlias, Case, CaseEvent,
     OverlapAlert, ActionConflictAlert, CoordinationWorkspace,
     CoordinationParticipant, CoordinationTask, CaseCoordinationLink,
-    Notification, DocumentMetadata, AuditLog
+    Notification, DocumentMetadata, AuditLog, ComplaintCategory
 )
 from app.api.auth import hash_password
 from app.services.matching_engine import compute_similarity
 
+def seed_complaint_categories(db: Session):
+    existing = db.query(ComplaintCategory).first()
+    if existing:
+        return
+
+    categories = [
+        ComplaintCategory(
+            code="ACADEMIC",
+            name="Academic Issues",
+            description="Curriculum non-compliance, unapproved syllabus alterations, academic schedule disruptions, or credit transfer issues.",
+            default_priority="Medium",
+            sla_days=30,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="EXAMINATION",
+            name="Examination and Results",
+            description="Grading irregularities, delay in marksheet issuance, unfair evaluation, or refusal of re-evaluation.",
+            default_priority="High",
+            sla_days=15,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="ADMISSION",
+            name="Admission and Enrollment",
+            description="Violations of statutory admission guidelines, capitation fee demands, quota manipulation, or eligibility disputes.",
+            default_priority="High",
+            sla_days=15,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="FEES_FINANCIAL",
+            name="Fees and Financial Issues",
+            description="Fee overcharging, unauthorized development surcharges, refusal of mandatory refund upon withdrawal, or caution money retention.",
+            default_priority="High",
+            sla_days=30,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="INFRASTRUCTURE",
+            name="Infrastructure and Facilities",
+            description="Deficits in lab equipment, inadequate safety standards, hostel sanitation, or library facility shortages.",
+            default_priority="Medium",
+            sla_days=45,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="ADMINISTRATIVE",
+            name="Administrative Issues",
+            description="Unlawful withholding of original certificates/degrees, delay in issuing migration certificates, or non-responsive administration.",
+            default_priority="High",
+            sla_days=15,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="FACULTY_STAFF",
+            name="Faculty and Staff Related Issues",
+            description="Irregular biometric attendance, shortage of qualified faculty cadre, teacher absenteeism, or unauthorized staff conduct.",
+            default_priority="Medium",
+            sla_days=30,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="STUDENT_WELFARE",
+            name="Student Welfare",
+            description="Delayed scholarship disbursements, non-functioning Student Grievance Redressal Committee (SGRC), or medical facility deficits.",
+            default_priority="Medium",
+            sla_days=30,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="HARASSMENT",
+            name="Harassment and Discrimination",
+            description="Anti-ragging violations, harassment based on caste/religion/gender, mental harassment, or victimization by institution officials.",
+            default_priority="Critical",
+            sla_days=7,
+            is_active=True
+        ),
+        ComplaintCategory(
+            code="OTHER",
+            name="Other",
+            description="Miscellaneous institutional grievances falling within statutory jurisdiction of AICTE.",
+            default_priority="Low",
+            sla_days=30,
+            is_active=True
+        ),
+    ]
+    db.add_all(categories)
+    db.commit()
+
 def seed_complainants(db: Session):
+    seed_complaint_categories(db)
     demo_comp = db.query(Complainant).filter(Complainant.email == "student.demo@nyayaniti.gov.in").first()
     if not demo_comp:
         demo_comp = Complainant(

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 # Auth & User
 class Token(BaseModel):
@@ -142,6 +142,7 @@ class CaseResponse(BaseModel):
     permanent_id: Optional[str] = None
     complainant_type: str
     complainant_masked: Optional[str] = None
+    title: Optional[str] = None
     category: str
     subcategory: Optional[str] = None
     description: str
@@ -161,6 +162,8 @@ class CaseResponse(BaseModel):
     overlap_review_status: str
     action_conflict_status: str
     created_at: datetime
+    complainant_id: Optional[int] = None
+    is_citizen_complaint: Optional[bool] = False
 
     class Config:
         from_attributes = True
@@ -385,20 +388,23 @@ class ComplainantToken(BaseModel):
 
 class ComplainantCaseCreate(BaseModel):
     institution_id: int
-    category: str
-    subcategory: Optional[str] = None
-    description: str
+    title: Optional[str] = Field(None, max_length=250)
+    category: str = Field(..., min_length=2, max_length=150)
+    subcategory: Optional[str] = Field(None, max_length=150)
+    description: str = Field(..., min_length=20, max_length=10000)
 
 class ComplainantCaseResponse(BaseModel):
     id: str
     institution_id: int
     institution_name: str
     permanent_id: str
+    title: Optional[str] = None
     category: str
     subcategory: Optional[str] = None
     description: str
     date_received: datetime
     status: str
+    priority: Optional[str] = "Medium"
     bureau_code: str
     last_action: Optional[str] = None
     last_action_date: Optional[datetime] = None
@@ -409,16 +415,107 @@ class ComplainantCaseResponse(BaseModel):
         from_attributes = True
 
 class ComplainantCaseEventItem(BaseModel):
+    id: Optional[int] = None
     event_type: str
+    previous_value: Optional[str] = None
+    new_value: Optional[str] = None
     remarks: Optional[str] = None
     timestamp: datetime
 
     class Config:
         from_attributes = True
 
-class ComplainantCaseDetailResponse(ComplainantCaseResponse):
-    events: List[ComplainantCaseEventItem] = []
+class ComplainantDocumentResponse(BaseModel):
+    id: int
+    case_id: str
+    file_name: str
+    original_filename: Optional[str] = None
+    file_size: int
+    file_type: str
+    category: str
+    upload_timestamp: datetime
 
     class Config:
         from_attributes = True
+
+class ComplainantCaseDetailResponse(ComplainantCaseResponse):
+    events: List[ComplainantCaseEventItem] = []
+    documents: List[ComplainantDocumentResponse] = []
+
+    class Config:
+        from_attributes = True
+
+# Aliases for statutory complaint terminology
+ComplaintCreate = ComplainantCaseCreate
+ComplaintResponse = ComplainantCaseResponse
+ComplaintDetailResponse = ComplainantCaseDetailResponse
+ComplaintHistoryItem = ComplainantCaseEventItem
+ComplaintDocumentResponse = ComplainantDocumentResponse
+
+class ComplainantInstitutionItem(BaseModel):
+    id: int
+    permanent_id: str
+    official_name: str
+    city: str
+    district: str
+    state: str
+    region: str
+    institution_type: str
+
+    class Config:
+        from_attributes = True
+
+class ComplainantCategoryItem(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: Optional[str] = None
+    default_priority: str
+    sla_days: int
+
+    class Config:
+        from_attributes = True
+
+class ComplainantReceiptResponse(BaseModel):
+    case_id: str
+    complainant_name: str
+    complainant_email: str
+    complainant_mobile: str
+    complainant_type: str
+    institution_name: str
+    permanent_id: str
+    institution_address: str
+    title: Optional[str] = None
+    category: str
+    subcategory: Optional[str] = None
+    description: str
+    date_received: datetime
+    prescribed_deadline: datetime
+    status: str
+    priority: str
+    bureau_name: str
+    tracking_url: str
+
+class ComplainantNotificationItem(BaseModel):
+    id: int
+    notification_type: str
+    related_case_id: Optional[str] = None
+    title: str
+    message: str
+    severity: str
+    is_read: bool
+    link_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ComplainantClarificationRequest(BaseModel):
+    response_text: str = Field(..., min_length=5, max_length=4000, description="Explanatory response to the bureau's information request")
+    document_id: Optional[int] = Field(None, description="Optional document ID if supplementary record was attached")
+
+class CaseInternalNoteRequest(BaseModel):
+    remarks: str = Field(..., min_length=3, max_length=2000, description="Internal officer deliberation or inspection observation")
+    is_public: bool = Field(False, description="Whether this note is visible to citizen timeline (default: False)")
+
 

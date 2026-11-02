@@ -9,7 +9,8 @@ from app.models.models import (
     Case, CaseEvent, User, Bureau, Institution, OverlapAlert, ActionConflictAlert, Notification
 )
 from app.schemas.schemas import (
-    CaseResponse, CaseDetailResponse, CaseCreate, CaseUpdate, PriorityOverrideRequest
+    CaseResponse, CaseDetailResponse, CaseCreate, CaseUpdate, PriorityOverrideRequest,
+    CaseInternalNoteRequest
 )
 from app.api.auth import get_current_user, require_role
 from app.services.audit_service import log_audit_event, record_case_event
@@ -20,6 +21,25 @@ from app.config import settings
 
 router = APIRouter(prefix="/cases", tags=["Case Management"])
 
+# Approved statutory status transitions matrix
+PERMITTED_STATUS_TRANSITIONS = {
+    # Approved complaint lifecycle
+    "Draft": {"Submitted"},
+    "Submitted": {"Under Review", "Rejected", "Under Process"},
+    "Under Review": {"In Progress", "Additional Information Required", "Rejected", "Under Process"},
+    "In Progress": {"Under Review", "Additional Information Required", "Resolved", "Closed", "Disposed"},
+    "Additional Information Required": {"Under Review", "In Progress", "Closed", "Rejected"},
+    "Resolved": {"Closed", "In Progress"},
+    "Closed": {"Under Review", "In Progress"},
+    "Rejected": {"Under Review"},
+    # Legacy statuses for backwards compatibility with seeded cases:
+    "Pending": {"Under Process", "Under Review", "In Progress", "Escalated", "Transferred", "Disposed", "Rejected"},
+    "Under Process": {"In Progress", "Additional Information Required", "Under Review", "Resolved", "Disposed", "Escalated", "Transferred"},
+    "Escalated": {"Under Process", "Under Review", "In Progress", "Resolved", "Disposed"},
+    "Transferred": {"Under Process", "Under Review", "In Progress"},
+    "Disposed": {"Under Review", "Under Process"}
+}
+
 def serialize_case(c: Case) -> dict:
     return {
         "id": c.id,
@@ -28,6 +48,7 @@ def serialize_case(c: Case) -> dict:
         "permanent_id": c.institution.permanent_id if c.institution else "N/A",
         "complainant_type": c.complainant_type,
         "complainant_masked": c.complainant_masked or "Redacted for Privacy",
+        "title": getattr(c, "title", None) or c.category,
         "category": c.category,
         "subcategory": c.subcategory,
         "description": c.description,
@@ -46,7 +67,9 @@ def serialize_case(c: Case) -> dict:
         "expected_disposal_date": c.expected_disposal_date,
         "overlap_review_status": c.overlap_review_status,
         "action_conflict_status": c.action_conflict_status,
-        "created_at": c.created_at
+        "created_at": c.created_at,
+        "complainant_id": c.complainant_id,
+        "is_citizen_complaint": c.complainant_id is not None
     }
 
 @router.get("", response_model=List[CaseResponse])
@@ -56,6 +79,7 @@ def list_cases(
     priority: Optional[str] = None,
     bureau_id: Optional[int] = None,
     institution_id: Optional[int] = None,
+    citizen_only: Optional[bool] = False,
     overdue_only: Optional[bool] = False,
     sort_by: Optional[str] = "date_received",
     order: Optional[str] = "desc",
@@ -84,11 +108,13 @@ def list_cases(
         query = query.filter(Case.current_bureau_id == bureau_id)
     if institution_id:
         query = query.filter(Case.institution_id == institution_id)
+    if citizen_only:
+        query = query.filter(Case.complainant_id != None)
     if overdue_only:
         now = datetime.utcnow()
         query = query.filter(
             Case.prescribed_deadline < now,
-            Case.status.in_(["Pending", "Under Process", "Escalated"])
+            Case.status.in_(["Pending", "Under Process", "Escalated", "Submitted", "Under Review", "In Progress"])
         )
         
     # Sort
@@ -303,18 +329,74 @@ def update_case(
     changes = []
     
     if update_data.status and update_data.status != c.status:
+        # Validate against permitted statutory transitions
+        allowed = PERMITTED_STATUS_TRANSITIONS.get(c.status, None)
+        if allowed is not None and update_data.status not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status transition from '{c.status}' to '{update_data.status}'. Permitted next statuses: {sorted(list(allowed)) if allowed else 'None (Terminal state)'}."
+            )
+
+        prev_status = c.status
+        c.status = update_data.status
+        changes.append(f"Status changed to {update_data.status}")
+
+        # Record public case event for status progression
         record_case_event(
             db=db,
             case_id=c.id,
             event_type="STATUS_CHANGE",
             actor_id=current_user.id,
             actor_name=current_user.full_name,
-            previous_value=c.status,
+            previous_value=prev_status,
             new_value=update_data.status,
-            remarks=update_data.remarks or f"Status transitioned to {update_data.status}"
+            remarks=update_data.remarks or f"Status transitioned to {update_data.status}",
+            is_public=True
         )
-        c.status = update_data.status
-        changes.append(f"Status changed to {update_data.status}")
+
+        # Citizen Notification for Complainant
+        if c.complainant_id:
+            notif_title = f"Complaint Status Updated: {update_data.status}"
+            notif_message = f"Your complaint {c.id} status has been updated to '{update_data.status}'."
+            notif_type = "STATUS_UPDATE"
+            notif_severity = "Info"
+
+            if update_data.status == "Additional Information Required":
+                notif_title = "Action Required: Additional Information Requested"
+                notif_message = f"AICTE PGRC has requested additional details or evidence for complaint {c.id}. Remarks: {update_data.remarks or 'Please review remarks and submit clarification.'}"
+                notif_type = "INFO_REQUESTED"
+                notif_severity = "High"
+            elif update_data.status == "Under Review":
+                notif_title = "Complaint Under Review"
+                notif_message = f"Your complaint {c.id} has been taken up for official review by AICTE PGRC."
+            elif update_data.status == "In Progress":
+                notif_title = "Inquiry In Progress"
+                notif_message = f"Your complaint {c.id} is now under active processing by designated officers."
+            elif update_data.status == "Resolved":
+                notif_title = "Complaint Resolved"
+                notif_message = f"Your complaint {c.id} has been resolved by AICTE PGRC. Remarks: {update_data.remarks or 'Complaint resolution completed.'}"
+            elif update_data.status == "Closed":
+                notif_title = "Complaint Closed"
+                notif_message = f"Your complaint {c.id} has been formally closed."
+            elif update_data.status == "Rejected":
+                notif_title = "Complaint Decision: Rejected"
+                notif_message = f"Your complaint {c.id} was rejected after review. Reason: {update_data.remarks or 'Does not fall within statutory grievance purview.'}"
+                notif_severity = "High"
+
+            notif = Notification(
+                recipient_id=None,
+                complainant_id=c.complainant_id,
+                notification_type=notif_type,
+                related_case_id=c.id,
+                related_entity_type="Case",
+                related_entity_id=c.id,
+                title=notif_title,
+                message=notif_message,
+                severity=notif_severity,
+                is_read=False,
+                link_url=f"/complainant/cases/{c.id}"
+            )
+            db.add(notif)
         
     if update_data.assigned_officer_id and update_data.assigned_officer_id != c.assigned_officer_id:
         new_officer = db.query(User).filter(User.id == update_data.assigned_officer_id).first()
@@ -328,7 +410,8 @@ def update_case(
             actor_name=current_user.full_name,
             previous_value=prev_name,
             new_value=new_name,
-            remarks=update_data.remarks or f"Reassigned responsibility to {new_name}"
+            remarks=update_data.remarks or f"Reassigned responsibility to {new_name}",
+            is_public=False
         )
         c.assigned_officer_id = update_data.assigned_officer_id
         changes.append(f"Officer assigned to {new_name}")
@@ -345,7 +428,8 @@ def update_case(
             actor_name=current_user.full_name,
             previous_value=prev_bureau,
             new_value=new_bureau_code,
-            remarks=update_data.remarks or f"Case officially transferred from {prev_bureau} to {new_bureau_code}"
+            remarks=update_data.remarks or f"Case officially transferred from {prev_bureau} to {new_bureau_code}",
+            is_public=True
         )
         c.current_bureau_id = update_data.current_bureau_id
         c.status = "Transferred"
@@ -361,7 +445,8 @@ def update_case(
             actor_id=current_user.id,
             actor_name=current_user.full_name,
             new_value=update_data.last_action,
-            remarks=update_data.remarks
+            remarks=update_data.remarks,
+            is_public=True
         )
         
     if update_data.next_action:
@@ -386,6 +471,49 @@ def update_case(
     )
     
     return serialize_case(c)
+
+@router.post("/{id}/notes")
+def add_case_note(
+    id: str,
+    note: CaseInternalNoteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Record an officer note or observation.
+    Confidential internal deliberations remain strictly protected with is_public=False.
+    """
+    c = db.query(Case).filter(Case.id == id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Case record not found")
+
+    event_type = "PUBLIC_NOTE" if note.is_public else "INTERNAL_NOTE"
+    record_case_event(
+        db=db,
+        case_id=c.id,
+        event_type=event_type,
+        actor_id=current_user.id,
+        actor_name=current_user.full_name,
+        remarks=note.remarks,
+        is_public=note.is_public
+    )
+
+    log_audit_event(
+        db=db,
+        actor_id=current_user.id,
+        actor_name=current_user.full_name,
+        actor_role=current_user.role,
+        event_type=event_type,
+        entity_type="Case",
+        entity_id=c.id,
+        remarks=note.remarks[:200]
+    )
+
+    return {
+        "message": f"{'Public milestone note' if note.is_public else 'Confidential internal note'} recorded successfully.",
+        "case_id": c.id,
+        "is_public": note.is_public
+    }
 
 @router.post("/{id}/override-priority", response_model=CaseResponse)
 def override_case_priority(

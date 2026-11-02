@@ -252,11 +252,13 @@ export interface ComplainantCaseItem {
   institution_id: number;
   institution_name: string;
   permanent_id: string;
+  title?: string;
   category: string;
   subcategory?: string;
   description: string;
   date_received: string;
   status: string;
+  priority?: string;
   bureau_code: string;
   last_action?: string;
   last_action_date?: string;
@@ -265,12 +267,95 @@ export interface ComplainantCaseItem {
 }
 
 export interface ComplainantCaseMilestone {
+  id?: number;
   event_type: string;
+  previous_value?: string;
+  new_value?: string;
   remarks?: string;
   timestamp: string;
 }
 
+export interface ComplaintSubmissionPayload {
+  title: string;
+  institution_id: number;
+  category: string;
+  subcategory?: string;
+  description: string;
+}
+
+export type ComplaintItem = ComplainantCaseItem;
+export type ComplaintDetail = ComplainantCaseDetail;
+export type ComplaintMilestone = ComplainantCaseMilestone;
+export type ComplaintDocument = ComplainantDocumentItem;
+export type ComplaintReceipt = ComplainantReceipt;
+export type ComplaintNotification = ComplainantNotificationItem;
+
+export interface ComplainantDocumentItem {
+  id: number;
+  case_id: string;
+  file_name: string;
+  original_filename?: string;
+  file_size: number;
+  file_type: string;
+  category: string;
+  upload_timestamp: string;
+}
+
 export interface ComplainantCaseDetail extends ComplainantCaseItem {
   events: ComplainantCaseMilestone[];
+  documents?: ComplainantDocumentItem[];
+}
+
+export interface ComplainantInstitutionItem {
+  id: number;
+  permanent_id: string;
+  official_name: string;
+  city: string;
+  district: string;
+  state: string;
+  region: string;
+  institution_type: string;
+}
+
+export interface ComplainantCategoryItem {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  default_priority: string;
+  sla_days: number;
+}
+
+export interface ComplainantReceipt {
+  case_id: string;
+  complainant_name: string;
+  complainant_email: string;
+  complainant_mobile: string;
+  complainant_type: string;
+  institution_name: string;
+  permanent_id: string;
+  institution_address: string;
+  title?: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  date_received: string;
+  prescribed_deadline: string;
+  status: string;
+  priority: string;
+  bureau_name: string;
+  tracking_url: string;
+}
+
+export interface ComplainantNotificationItem {
+  id: number;
+  notification_type: string;
+  related_case_id?: string;
+  title: string;
+  message: string;
+  severity: string;
+  is_read: boolean;
+  link_url?: string;
+  created_at: string;
 }
 

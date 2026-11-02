@@ -58,7 +58,10 @@ app.include_router(admin_settings.router, prefix=settings.API_V1_PREFIX)
 
 # Include routers - Citizen & Complainant Space
 app.include_router(complainant_auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(complainant_cases.complaints_router, prefix=settings.API_V1_PREFIX)
 app.include_router(complainant_cases.router, prefix=settings.API_V1_PREFIX)
+app.include_router(complainant_cases.notification_router, prefix=settings.API_V1_PREFIX)
+app.include_router(complainant_cases.citizen_directory_router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():

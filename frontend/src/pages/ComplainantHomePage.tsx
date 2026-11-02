@@ -97,19 +97,19 @@ export const ComplainantHomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Phase 4 Transition Callout */}
+          {/* Phase 4 Active Callout */}
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8 flex flex-col justify-between space-y-6">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span>Phase 3 Milestone Complete • Phase 4 Provisioning</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Phase 4 Grievance Redressal Workspace Active</span>
               </div>
               <h2 className="text-xl font-bold text-slate-900">
                 Citizen Grievance Submission & Milestone Tracking
               </h2>
               <p className="text-slate-600 text-sm leading-relaxed">
                 Your complainant authentication, session isolation, and cryptographic identity boundary are fully operational.
-                The comprehensive self-service grievance lodging and milestone lifecycle tracking workspace is scheduled for activation in <strong>Phase 4</strong>.
+                You can now file new institutional grievances, upload supporting evidentiary documents, monitor statutory milestones, and download official AICTE acknowledgment slips.
               </p>
             </div>
 
@@ -130,21 +130,24 @@ export const ComplainantHomePage: React.FC = () => {
                   <span>Real-Time Milestone Timeline</span>
                 </div>
                 <p className="text-xs text-slate-500 leading-normal">
-                  Transparent multi-stage progress tracking from intake to verification and resolution.
+                  Transparent 5-stage progress tracking from intake to verification and resolution.
                 </p>
               </div>
             </div>
 
             <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100">
-              <span className="text-xs text-slate-400">
-                AICTE NyayaNiti Citizen Security Engine • Zero administrative leakage
-              </span>
+              <Link
+                to="/complainant/dashboard"
+                className="btn-3d-amber px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer"
+              >
+                <span>Access Grievance Dashboard</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
               <Link
                 to="/"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#092D62] hover:text-blue-700 hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#092D62]"
               >
                 <span>Explore Platform Capabilities</span>
-                <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

@@ -1,425 +1,376 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useComplainantAuth } from '../context/ComplainantAuthContext';
 import { ComplainantHeader } from '../components/common/ComplainantHeader';
+import { GrievanceReceiptModal } from '../components/complainant/GrievanceReceiptModal';
 import { api } from '../services/api';
-import { ComplainantCaseItem, ComplainantCaseDetail } from '../types';
+import { ComplainantCaseItem, ComplainantReceipt } from '../types';
 import {
   FileText, PlusCircle, CheckCircle2, Clock, AlertTriangle, Building2,
-  Calendar, ChevronDown, ChevronUp, Send, X, RefreshCw
+  Calendar, RefreshCw, ArrowRight, Eye, Printer, Shield, ArrowUpRight
 } from 'lucide-react';
 
 export const ComplainantDashboardPage: React.FC = () => {
   const { complainant } = useComplainantAuth();
+  const navigate = useNavigate();
 
   const [cases, setCases] = useState<ComplainantCaseItem[]>([]);
-  const [institutions, setInstitutions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Milestone detail expansion state
-  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
-  const [caseDetail, setCaseDetail] = useState<ComplainantCaseDetail | null>(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  // Receipt Modal state
+  const [activeReceipt, setActiveReceipt] = useState<ComplainantReceipt | null>(null);
+  const [isLoadingReceipt, setIsLoadingReceipt] = useState(false);
 
-  // New Grievance Form State
-  const [showFileModal, setShowFileModal] = useState(false);
-  const [selectedInstId, setSelectedInstId] = useState<number | ''>('');
-  const [category, setCategory] = useState('Fee Overcharging & Refund Denial');
-  const [description, setDescription] = useState('');
-  const [isFiling, setIsFiling] = useState(false);
-  const [fileSuccess, setFileSuccess] = useState<string | null>(null);
-
-  const loadData = useCallback(async () => {
+  const loadDashboardData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [casesRes, instRes] = await Promise.all([
-        api.getComplainantCases(),
-        api.getInstitutions()
-      ]);
-      setCases(casesRes || []);
-      setInstitutions(instRes || []);
+      const data = await api.getComplainantComplaints();
+      setCases(data || []);
     } catch (err: any) {
-      setError(err.message || 'Failed to retrieve grievances from citizen registry.');
+      setError(err.message || 'Failed to retrieve your grievance records.');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadDashboardData();
+  }, [loadDashboardData]);
 
-  const toggleExpandMilestones = async (caseId: string) => {
-    if (expandedCaseId === caseId) {
-      setExpandedCaseId(null);
-      setCaseDetail(null);
-      return;
-    }
-
-    setExpandedCaseId(caseId);
-    setIsLoadingDetail(true);
+  const handleOpenReceipt = async (caseId: string) => {
+    setIsLoadingReceipt(true);
     try {
-      const detail = await api.getComplainantCaseDetail(caseId);
-      setCaseDetail(detail);
+      const receipt = await api.getComplainantReceipt(caseId);
+      setActiveReceipt(receipt);
     } catch (err: any) {
-      console.error('Milestone fetch failed', err);
+      alert(`Unable to generate acknowledgment slip: ${err.message}`);
     } finally {
-      setIsLoadingDetail(false);
-    }
-  };
-
-  const handleFileGrievance = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedInstId || !description.trim()) {
-      return;
-    }
-
-    setIsFiling(true);
-    try {
-      const res = await api.fileComplainantCase({
-        institution_id: Number(selectedInstId),
-        category,
-        description: description.trim()
-      });
-      setFileSuccess(`Grievance successfully submitted! Case ID: ${res.id}`);
-      setDescription('');
-      setSelectedInstId('');
-      setShowFileModal(false);
-      await loadData();
-    } catch (err: any) {
-      alert(`Submission failed: ${err.message}`);
-    } finally {
-      setIsFiling(false);
+      setIsLoadingReceipt(false);
     }
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Disposed':
-      case 'Resolved':
-        return <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded">Disposed</span>;
-      case 'Under Process':
-        return <span className="bg-blue-100 text-[#092D62] border border-blue-300 text-[10px] font-bold px-2 py-0.5 rounded">Under Process</span>;
-      case 'Escalated':
-        return <span className="bg-red-100 text-red-800 border border-red-300 text-[10px] font-bold px-2 py-0.5 rounded">Escalated</span>;
-      default:
-        return <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-2 py-0.5 rounded">Pending Scrutiny</span>;
+    const s = (status || '').toLowerCase();
+    if (s.includes('additional') || s.includes('clarification') || s.includes('info required')) {
+      return (
+        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+          <AlertTriangle className="w-3 h-3 text-amber-600 animate-pulse" />
+          Info Required
+        </span>
+      );
     }
+    if (s.includes('disposed') || s.includes('resolved') || s.includes('closed')) {
+      return (
+        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          Resolved / Disposed
+        </span>
+      );
+    }
+    if (s.includes('in progress') || s.includes('hearing') || s.includes('under process')) {
+      return (
+        <span className="inline-flex items-center gap-1 bg-blue-100 text-[#092D62] border border-blue-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
+          In Progress
+        </span>
+      );
+    }
+    if (s.includes('under review') || s.includes('scrutiny') || s.includes('allocated')) {
+      return (
+        <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 border border-purple-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+          <Clock className="w-3 h-3 text-purple-600" />
+          Under Review
+        </span>
+      );
+    }
+    if (s.includes('rejected')) {
+      return (
+        <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 border border-red-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+          <AlertTriangle className="w-3 h-3 text-red-600" />
+          Rejected
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+        <Clock className="w-3 h-3 text-amber-600" />
+        Submitted
+      </span>
+    );
   };
 
-  const pendingCount = cases.filter(c => c.status === 'Pending').length;
-  const inProgressCount = cases.filter(c => c.status === 'Under Process').length;
-  const resolvedCount = cases.filter(c => c.status === 'Disposed' || c.status === 'Resolved').length;
+  // Exact 5 Required Statistics (computed dynamically from real backend cases)
+  const totalSubmitted = cases.length;
+  const submittedCount = cases.filter(c => c.status === 'Submitted').length;
+  const underReviewCount = cases.filter(c => {
+    const s = (c.status || '').toLowerCase();
+    return s.includes('under review') || s.includes('pending') || s.includes('scrutiny');
+  }).length;
+  const inProgressCount = cases.filter(c => {
+    const s = (c.status || '').toLowerCase();
+    return s.includes('in progress') || s.includes('under process') || s.includes('hearing');
+  }).length;
+  const resolvedCount = cases.filter(c => {
+    const s = (c.status || '').toLowerCase();
+    return s.includes('resolved') || s.includes('disposed') || s.includes('closed');
+  }).length;
+
+  // Recent complaints (latest 5)
+  const recentComplaints = cases.slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-[#F4F6F9] flex flex-col">
-      {/* Citizen Header */}
+    <div className="min-h-screen bg-[#F4F6F9] flex flex-col font-sans">
       <ComplainantHeader />
 
       <main className="max-w-7xl mx-auto px-4 py-8 w-full space-y-6 flex-1">
-        {/* Banner with Welcome & Actions */}
-        <div className="bg-gradient-to-r from-[#061E46] via-[#092D62] to-[#0D3875] text-white rounded-xl p-6 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold text-[#FFB900] uppercase tracking-wider bg-white/10 px-2.5 py-0.5 rounded">
-              Citizen Tracking Console
-            </span>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight">
+        {/* 1. Welcome Section with Complainant Name & Action CTAs */}
+        <div className="bg-gradient-to-r from-[#061E46] via-[#092D62] to-[#0D3875] text-white rounded-2xl p-6 sm:p-8 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-b-4 border-[#FFB900]">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-xs border border-white/20 text-xs font-semibold text-[#FFB900]">
+              <Shield className="w-3.5 h-3.5" />
+              <span>Public Grievance Redressal Portal • AICTE PGRC</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
               Welcome, {complainant?.full_name || 'Citizen'}
             </h1>
-            <p className="text-xs text-slate-200">
-              Track active inquiries, official milestone determinations, and submit new grievances to AICTE bureaus.
+            <p className="text-xs sm:text-sm text-slate-200 max-w-2xl leading-relaxed">
+              Track the statutory redressal progression of your institutional complaints, submit new grievances, and access official AICTE determinations.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              onClick={() => setShowFileModal(true)}
-              className="btn-3d-amber px-4 py-2.5 rounded text-xs font-bold flex items-center gap-2 cursor-pointer shadow-sm w-full sm:w-auto justify-center"
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <Link
+              to="/complainant/submit"
+              className="btn-3d-amber px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer w-full sm:w-auto"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>File New Grievance</span>
-            </button>
+              <span>Submit New Complaint</span>
+            </Link>
 
             <button
-              onClick={loadData}
-              className="p-2.5 rounded bg-white/10 hover:bg-white/20 text-white cursor-pointer transition-colors"
-              title="Refresh"
+              onClick={loadDashboardData}
+              disabled={isLoading}
+              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white cursor-pointer transition-colors border border-white/10"
+              title="Refresh Dashboard Data"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {fileSuccess && (
-          <div className="bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-300 text-xs flex items-center justify-between gap-3 shadow-2xs">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              <span>{fileSuccess}</span>
-            </div>
-            <button
-              onClick={() => setFileSuccess(null)}
-              className="text-emerald-700 font-bold hover:text-emerald-900 cursor-pointer"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
         {error && (
-          <div className="bg-red-50 text-red-800 p-4 rounded-xl border border-red-300 text-xs flex items-center gap-2">
+          <div className="bg-red-50 text-red-800 p-4 rounded-xl border border-red-300 text-xs flex items-center gap-2 shadow-2xs">
             <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* 4 KPI Metrics */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 2 - 6. Exact 5 Statistical Metric Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* Card 1: Total complaints submitted */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Complaints</span>
-            <div className="text-2xl font-black text-[#061E46]">{cases.length}</div>
-            <p className="text-[10px] text-slate-400">Total filed under this account</p>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+              Total Complaints
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-[#061E46]">
+              {totalSubmitted}
+            </div>
+            <p className="text-[10px] text-slate-400">Total institutional petitions filed</p>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Pending Scrutiny</span>
-            <div className="text-2xl font-black text-amber-600">{pendingCount}</div>
-            <p className="text-[10px] text-slate-400">Awaiting bureau allocation</p>
+          {/* Card 2: Submitted complaints count */}
+          <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-2xs space-y-1 bg-amber-50/20">
+            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider block">
+              Submitted
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-amber-600">
+              {submittedCount}
+            </div>
+            <p className="text-[10px] text-slate-400">Awaiting bureau intake verification</p>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">In Process</span>
-            <div className="text-2xl font-black text-[#092D62]">{inProgressCount}</div>
-            <p className="text-[10px] text-slate-400">Under active bureau inquiry</p>
+          {/* Card 3: Under Review count */}
+          <div className="bg-white p-4 rounded-xl border border-purple-200 shadow-2xs space-y-1 bg-purple-50/20">
+            <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block">
+              Under Review
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-purple-600">
+              {underReviewCount}
+            </div>
+            <p className="text-[10px] text-slate-400">Preliminary scrutiny in progress</p>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-            <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Resolved / Disposed</span>
-            <div className="text-2xl font-black text-emerald-600">{resolvedCount}</div>
-            <p className="text-[10px] text-slate-400">Final determinations issued</p>
+          {/* Card 4: In Progress count */}
+          <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-2xs space-y-1 bg-blue-50/20">
+            <span className="text-[11px] font-bold text-[#1E5AA8] uppercase tracking-wider block">
+              In Progress
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-[#092D62]">
+              {inProgressCount}
+            </div>
+            <p className="text-[10px] text-slate-400">Under active bureau inquiry & notice</p>
+          </div>
+
+          {/* Card 5: Resolved count */}
+          <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-2xs space-y-1 bg-emerald-50/20 col-span-2 md:col-span-1">
+            <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">
+              Resolved / Disposed
+            </span>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-600">
+              {resolvedCount}
+            </div>
+            <p className="text-[10px] text-slate-400">Final determinations communicated</p>
           </div>
         </div>
 
-        {/* Complaints Listing */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-[#061E46] flex items-center gap-2">
+        {/* 7 - 12. Recent Complaints Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#1E5AA8]" />
-              <span>My Grievance Tracking Records</span>
-            </h2>
-            <span className="text-xs text-slate-500 font-mono">
-              Showing {cases.length} records
-            </span>
+              <h2 className="text-sm font-bold text-[#061E46]">Recent Institutional Complaints</h2>
+              <span className="text-xs text-slate-400 font-mono ml-2">
+                (Latest {recentComplaints.length} of {totalSubmitted})
+              </span>
+            </div>
+
+            <Link
+              to="/complainant/complaints"
+              className="text-xs font-bold text-[#1E5AA8] hover:text-[#092D62] flex items-center gap-1 transition-colors"
+            >
+              <span>View All Complaints</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
           {isLoading ? (
             <div className="p-12 text-center space-y-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#092D62] mx-auto" />
-              <p className="text-xs text-slate-500">Loading grievance records...</p>
+              <p className="text-xs text-slate-500">Retrieving grievance records from AICTE registry...</p>
             </div>
           ) : cases.length === 0 ? (
-            <div className="p-12 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-blue-50 text-[#092D62] flex items-center justify-center mx-auto">
-                <FileText className="w-6 h-6 text-[#1E5AA8]" />
+            <div className="p-12 text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-blue-50 text-[#092D62] flex items-center justify-center mx-auto border border-blue-100">
+                <FileText className="w-7 h-7 text-[#1E5AA8]" />
               </div>
-              <h3 className="text-sm font-bold text-[#061E46]">No Grievances Filed Yet</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                You have not registered any complaints yet. Click &quot;File New Grievance&quot; above to submit an institutional petition to AICTE.
-              </p>
+              <div className="space-y-1 max-w-sm mx-auto">
+                <h3 className="text-sm font-bold text-[#061E46]">No Grievances Submitted Yet</h3>
+                <p className="text-xs text-slate-500">
+                  You have not registered any institutional petitions. Click below to file a formal complaint with AICTE.
+                </p>
+              </div>
+              <Link
+                to="/complainant/submit"
+                className="btn-3d-amber px-5 py-2.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 shadow-sm cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Submit Your First Grievance</span>
+              </Link>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {cases.map((c) => {
-                const isExpanded = expandedCaseId === c.id;
-
-                return (
-                  <div key={c.id} className="p-4 sm:p-5 hover:bg-slate-50/60 transition-colors">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-mono font-black text-[#092D62] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                            {c.id}
-                          </span>
-                          {getStatusBadge(c.status)}
-                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                            Assigned: {c.bureau_code} Bureau
-                          </span>
-                        </div>
-
-                        <h3 className="text-sm font-bold text-[#061E46] flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{c.institution_name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono font-normal">
-                            ({c.permanent_id})
-                          </span>
-                        </h3>
-
-                        <p className="text-xs text-slate-600 line-clamp-2">
-                          <strong className="text-slate-700">{c.category}:</strong> {c.description}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500 pt-1">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-slate-400" />
-                            Filed: {new Date(c.date_received).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-amber-600" />
-                            SLA Target: {new Date(c.prescribed_deadline).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </span>
-                          {c.last_action && (
-                            <span className="text-slate-600">
-                              Latest: <em>{c.last_action}</em>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        <button
-                          onClick={() => toggleExpandMilestones(c.id)}
-                          className="btn-3d-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-4">Reference No.</th>
+                    <th className="py-3 px-4">Category & Subject</th>
+                    <th className="py-3 px-4">Institution Name</th>
+                    <th className="py-3 px-4">Submission Date</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {recentComplaints.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
+                      {/* 8. Complaint reference number */}
+                      <td className="py-3.5 px-4 font-mono font-bold text-[#092D62] whitespace-nowrap">
+                        <Link
+                          to={`/complainant/complaints/${c.id}`}
+                          className="hover:underline flex items-center gap-1 group"
                         >
-                          <span>{isExpanded ? 'Hide Milestones' : 'Track Milestones'}</span>
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
+                          <span>{c.id}</span>
+                          <ArrowUpRight className="w-3 h-3 text-slate-400 group-hover:text-[#092D62]" />
+                        </Link>
+                      </td>
 
-                    {/* Milestone Timeline Drawer */}
-                    {isExpanded && (
-                      <div className="mt-4 pt-4 border-t border-slate-200/80 bg-[#F4F6F9] -mx-4 -mb-4 sm:-mx-5 sm:-mb-5 p-4 sm:p-5 space-y-3">
-                        <h4 className="text-xs font-bold text-[#061E46] uppercase tracking-wider flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-[#1E5AA8]" />
-                          <span>Official Redressal Milestones</span>
-                        </h4>
+                      {/* 9. Complaint category & title */}
+                      <td className="py-3.5 px-4 max-w-xs">
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-[#061E46] block truncate">
+                            {c.title || c.category}
+                          </span>
+                          <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-medium border border-amber-200 inline-block">
+                            {c.category}
+                          </span>
+                        </div>
+                      </td>
 
-                        {isLoadingDetail ? (
-                          <div className="py-4 text-center text-xs text-slate-500">
-                            Loading official timeline...
-                          </div>
-                        ) : caseDetail && caseDetail.events && caseDetail.events.length > 0 ? (
-                          <div className="space-y-3 relative before:absolute before:top-2 before:bottom-2 before:left-3 before:w-0.5 before:bg-slate-300 pl-7">
-                            {caseDetail.events.map((ev, i) => (
-                              <div key={i} className="relative space-y-0.5">
-                                <div className="absolute -left-7 top-1 w-2.5 h-2.5 rounded-full bg-[#092D62] border-2 border-white shadow-xs" />
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="font-bold text-[#061E46]">{ev.event_type}</span>
-                                  <span className="text-[10px] text-slate-500 font-mono">
-                                    {new Date(ev.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-600">{ev.remarks}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-500 italic">No additional milestones recorded yet. Bureau review in progress.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {/* 10. Institution name */}
+                      <td className="py-3.5 px-4 max-w-xs">
+                        <div className="space-y-0.5">
+                          <span className="font-medium text-slate-800 flex items-center gap-1 truncate">
+                            <Building2 className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                            {c.institution_name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            ID: {c.permanent_id}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 11. Submission date */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-slate-600">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-slate-400" />
+                          {new Date(c.date_received).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </td>
+
+                      {/* 12. Current status indicator */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {getStatusBadge(c.status)}
+                      </td>
+
+                      {/* Action buttons */}
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenReceipt(c.id)}
+                            disabled={isLoadingReceipt}
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-[#092D62] hover:bg-slate-100 transition-colors"
+                            title="Print Acknowledgment Slip"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                          </button>
+                          <Link
+                            to={`/complainant/complaints/${c.id}`}
+                            className="btn-3d-white px-2.5 py-1 rounded text-xs font-bold inline-flex items-center gap-1 shadow-2xs"
+                          >
+                            <Eye className="w-3 h-3 text-[#1E5AA8]" />
+                            <span>Track</span>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        {/* Modal: File New Grievance */}
-        {showFileModal && (
-          <div className="fixed inset-0 z-50 bg-[#061E46]/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-xl w-full p-6 space-y-5">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div className="flex items-center gap-2">
-                  <PlusCircle className="w-5 h-5 text-[#FFB900]" />
-                  <h3 className="text-base font-bold text-[#061E46]">Submit New Institutional Grievance</h3>
-                </div>
-                <button
-                  onClick={() => setShowFileModal(false)}
-                  className="text-slate-400 hover:text-slate-600 font-bold p-1 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleFileGrievance} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#061E46] mb-1">
-                    Select AICTE Approved Institution <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    required
-                    value={selectedInstId}
-                    onChange={(e) => setSelectedInstId(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full text-xs p-2.5 rounded border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-[#092D62]"
-                  >
-                    <option value="">-- Choose Institution --</option>
-                    {institutions.map((inst) => (
-                      <option key={inst.id} value={inst.id}>
-                        {inst.official_name} ({inst.permanent_id}) — {inst.city}, {inst.state}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#061E46] mb-1">
-                    Grievance Category <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-[#092D62]"
-                  >
-                    <option value="Fee Overcharging & Refund Denial">Fee Overcharging & Refund Denial</option>
-                    <option value="Anti-Ragging Non-Compliance">Anti-Ragging Non-Compliance</option>
-                    <option value="Faculty Irregularity & Biometric Deficit">Faculty Irregularity & Biometric Deficit</option>
-                    <option value="Certificate & Document Withholding">Certificate & Document Withholding</option>
-                    <option value="Infrastructure Deficit & Lab Equipment Shortage">Infrastructure Deficit & Lab Equipment Shortage</option>
-                    <option value="Admission Irregularity & Capitation Fee">Admission Irregularity & Capitation Fee</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#061E46] mb-1">
-                    Factual Description & Allegation Details <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    rows={4}
-                    required
-                    minLength={20}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Provide detailed factual narrative including dates, program name, and specific violations..."
-                    className="w-full text-xs p-3 rounded border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#092D62]"
-                  />
-                  <span className="text-[10px] text-slate-400 block text-right">
-                    Minimum 20 characters required. Factual evidence will be requested during inquiry.
-                  </span>
-                </div>
-
-                <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setShowFileModal(false)}
-                    className="px-4 py-2 rounded text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isFiling}
-                    className="btn-3d-amber px-5 py-2.5 rounded text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-60"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{isFiling ? 'Registering Grievance...' : 'Submit to AICTE'}</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        {/* Printable Statutory Acknowledgment Slip Modal */}
+        <GrievanceReceiptModal
+          receipt={activeReceipt}
+          onClose={() => setActiveReceipt(null)}
+        />
       </main>
     </div>
   );
