@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
-import { api } from '../services/api';
+import { api, setUnauthorizedHandler } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -35,6 +35,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // Register global unauthorized session handler
+    setUnauthorizedHandler(() => {
+      logout();
+    });
+
     const token = localStorage.getItem('nyayaniti_token');
     const storedUser = localStorage.getItem('nyayaniti_user');
     if (token && storedUser) {
@@ -62,6 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setIsLoading(false);
     }
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
   }, []);
 
   // Sync high-contrast class to root body

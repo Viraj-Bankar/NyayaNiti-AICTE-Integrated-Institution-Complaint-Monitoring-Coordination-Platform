@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Lock, UserCheck, AlertCircle, Sparkles, Building2 } from 'lucide-react';
+import { AlertCircle, Sparkles } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -9,8 +9,18 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login, demoLogin } = useAuth();
+  const { login, demoLogin, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const destination = (location.state as { from?: { pathname?: string } })?.from?.pathname || '/dashboard';
+
+  // If already authenticated, redirect immediately
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +32,7 @@ export const LoginPage: React.FC = () => {
     setError(null);
     try {
       await login(username, password);
-      navigate('/dashboard');
+      navigate(destination, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Invalid username or password');
     } finally {
@@ -35,7 +45,7 @@ export const LoginPage: React.FC = () => {
     setError(null);
     try {
       await demoLogin(role);
-      navigate('/dashboard');
+      navigate(destination, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Fast login failed');
     } finally {

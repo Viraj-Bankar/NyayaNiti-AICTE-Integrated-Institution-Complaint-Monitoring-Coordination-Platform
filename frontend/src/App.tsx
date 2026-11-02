@@ -1,10 +1,11 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GovTopBar } from './components/common/GovTopBar';
 import { GovHeader } from './components/common/GovHeader';
 import { GovNavBar } from './components/common/GovNavBar';
 import { GovFooter } from './components/common/GovFooter';
+import { RoleRoute } from './components/common/RoleRoute';
 
 import { LandingPage } from './pages/LandingPage';
 import { ExplorePage } from './pages/ExplorePage';
@@ -45,10 +46,11 @@ const RootRoute: React.FC = () => {
 /**
  * ProtectedRoute:
  * Protects operational application routes from unauthenticated public visitors.
- * Redirects unauthenticated attempts directly to the public Explore page.
+ * Redirects unauthenticated attempts directly to /login with original location state preserved.
  */
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -59,7 +61,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
@@ -183,17 +185,17 @@ export const App: React.FC = () => {
               <Route
                 path="/audit"
                 element={
-                  <ProtectedRoute>
+                  <RoleRoute allowedRoles={['super_admin', 'monitoring_officer']}>
                     <AuditLogsPage />
-                  </ProtectedRoute>
+                  </RoleRoute>
                 }
               />
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute>
+                  <RoleRoute allowedRoles={['super_admin']}>
                     <AdminSettingsPage />
-                  </ProtectedRoute>
+                  </RoleRoute>
                 }
               />
 

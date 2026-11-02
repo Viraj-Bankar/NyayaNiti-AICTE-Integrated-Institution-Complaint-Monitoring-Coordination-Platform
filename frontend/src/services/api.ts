@@ -54,9 +54,25 @@ function getAuthHeaders(): HeadersInit {
   return headers;
 }
 
+type UnauthorizedHandler = () => void;
+let onUnauthorizedCallback: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  onUnauthorizedCallback = handler;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   const contentType = res.headers.get('content-type') || '';
   if (!res.ok) {
+    if (res.status === 401) {
+      if (onUnauthorizedCallback) {
+        onUnauthorizedCallback();
+      } else {
+        localStorage.removeItem('nyayaniti_token');
+        localStorage.removeItem('nyayaniti_user');
+      }
+      window.dispatchEvent(new CustomEvent('nyayaniti:session-expired'));
+    }
     let errMessage = `HTTP ${res.status}: ${res.statusText}`;
     try {
       if (contentType.includes('application/json')) {
