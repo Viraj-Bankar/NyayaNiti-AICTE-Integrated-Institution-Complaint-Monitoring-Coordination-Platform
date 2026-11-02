@@ -4,7 +4,13 @@ import { Eye, Globe, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const GovTopBar: React.FC = () => {
-  const { fontSize, setFontSize, highContrast, toggleHighContrast, language, setLanguage, user, logout } = useAuth();
+  const {
+    fontSize, setFontSize,
+    highContrast, toggleHighContrast,
+    language, setLanguage,
+    user, isAuthenticated, isLoading,
+    logout
+  } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -78,7 +84,7 @@ export const GovTopBar: React.FC = () => {
           </button>
 
           {/* Auth Status & Quick Action (Authenticated Only) */}
-          {user && (
+          {!isLoading && isAuthenticated && user && (
             <div className="flex items-center gap-2 border-l border-slate-700 pl-2">
               <span className="bg-[#1E5AA8] text-white px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1">
                 <Shield className="w-3 h-3 text-[#FFB900]" />

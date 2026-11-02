@@ -8,16 +8,16 @@ import {
 } from 'lucide-react';
 
 export const GovNavBar: React.FC = () => {
-  const { isAuthenticated, user, hasRole } = useAuth();
+  const { isAuthenticated, isLoading, user, hasRole } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ============================================================
   // STRICT REQUIREMENT: UNIFORM PUBLIC WEBSITE EXPERIENCE
-  // Before login, do NOT render operational navigation tabs or
-  // public explore section tabs. Public visitors see only the
-  // single continuous Explore page.
+  // Before login or during authentication loading, do NOT render
+  // operational navigation tabs or public explore section tabs.
+  // Public visitors see only the single continuous Explore page.
   // ============================================================
-  if (!isAuthenticated || !user) {
+  if (isLoading || !isAuthenticated || !user) {
     return null;
   }
 
