@@ -169,7 +169,7 @@ def test_successful_login():
 
 
 # -------------------------------------------------------------------------
-# 6. Incorrect Password Rejection
+# 6. Incorrect Password & Unknown Account Rejection
 # -------------------------------------------------------------------------
 def test_incorrect_password():
     payload = generate_unique_citizen_payload("wrongpw")
@@ -181,6 +181,25 @@ def test_incorrect_password():
     })
     assert login_res.status_code == 401
     assert "incorrect" in login_res.json()["detail"].lower()
+
+
+def test_unknown_account_login():
+    # Attempt login with non-existent email
+    res_unknown_email = client.post("/api/complainant/login", json={
+        "email": f"nonexistent_{uuid.uuid4().hex[:8]}@example.com",
+        "password": "ValidPassword123!"
+    })
+    assert res_unknown_email.status_code == 401
+    # Safe error message prevents account enumeration
+    assert "incorrect email/mobile or password" in res_unknown_email.json()["detail"].lower()
+
+    # Attempt login with non-existent mobile
+    res_unknown_mobile = client.post("/api/complainant/login", json={
+        "email": "9999988888",
+        "password": "ValidPassword123!"
+    })
+    assert res_unknown_mobile.status_code == 401
+    assert "incorrect email/mobile or password" in res_unknown_mobile.json()["detail"].lower()
 
 
 # -------------------------------------------------------------------------
@@ -257,7 +276,7 @@ def test_invalid_and_expired_jwt():
 
 
 # -------------------------------------------------------------------------
-# 9. Complainant Token Rejected by Officer APIs
+# 9. Complainant Token Rejected by Officer APIs & Administrative Settings & Audit Logs
 # -------------------------------------------------------------------------
 def test_complainant_token_rejected_by_officer_apis():
     payload = generate_unique_citizen_payload("isolation")
@@ -270,16 +289,25 @@ def test_complainant_token_rejected_by_officer_apis():
     comp_token = login_res.json()["access_token"]
     comp_headers = {"Authorization": f"Bearer {comp_token}"}
 
-    # Internal officer endpoints MUST reject complainant tokens with HTTP 403
+    # Internal officer operational endpoints MUST reject complainant tokens with HTTP 401 or 403
     cases_res = client.get("/api/cases", headers=comp_headers)
     assert cases_res.status_code in [401, 403]
 
     overlaps_res = client.get("/api/overlaps", headers=comp_headers)
     assert overlaps_res.status_code in [401, 403]
 
+    # Administrative settings endpoints MUST reject complainant tokens
     settings_res = client.get("/api/settings/users", headers=comp_headers)
     assert settings_res.status_code in [401, 403]
 
+    thresholds_res = client.get("/api/settings/thresholds", headers=comp_headers)
+    assert thresholds_res.status_code in [401, 403]
+
+    # Audit log endpoints MUST reject complainant tokens
+    audit_res = client.get("/api/audit", headers=comp_headers)
+    assert audit_res.status_code in [401, 403]
+
+    # Officer profile endpoint MUST reject complainant tokens
     auth_me_res = client.get("/api/auth/me", headers=comp_headers)
     assert auth_me_res.status_code in [401, 403]
 
