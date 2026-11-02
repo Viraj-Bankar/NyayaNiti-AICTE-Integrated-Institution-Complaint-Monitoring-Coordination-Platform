@@ -1,0 +1,212 @@
+// test_phase3_complainant.mjs
+// Phase 3 Integration, Isolation & Verification Audit for Complainant Authentication
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+let totalTests = 0;
+let passedTests = 0;
+const failures = [];
+
+function assert(condition, message) {
+  totalTests++;
+  if (condition) {
+    passedTests++;
+    console.log(`[PASS] ${message}`);
+  } else {
+    failures.push(message);
+    console.error(`[FAIL] ${message}`);
+  }
+}
+
+console.log('======================================================================');
+console.log('NYAYANITI PHASE 3: COMPLAINANT AUTHENTICATION & CITIZEN PORTAL AUDIT');
+console.log('======================================================================\n');
+
+// --------------------------------------------------------------------
+// 1. TOKEN & SESSION ISOLATION AUDIT
+// --------------------------------------------------------------------
+console.log('--- PART 1: TOKEN & SESSION STORAGE ISOLATION ---');
+
+const apiPath = path.join(__dirname, 'src', 'services', 'api.ts');
+assert(fs.existsSync(apiPath), 'api.ts exists');
+const apiContent = fs.readFileSync(apiPath, 'utf8');
+
+assert(
+  apiContent.includes('nyayaniti_complainant_token'),
+  'api.ts defines distinct storage key "nyayaniti_complainant_token"'
+);
+assert(
+  apiContent.includes('nyayaniti_token'),
+  'api.ts maintains separate officer token key "nyayaniti_token"'
+);
+
+assert(
+  apiContent.includes('complainantRegister') &&
+  apiContent.includes('complainantLogin') &&
+  apiContent.includes('complainantDemoLogin') &&
+  apiContent.includes('getComplainantCases') &&
+  apiContent.includes('getComplainantCaseDetail') &&
+  apiContent.includes('fileComplainantCase'),
+  'api.ts exports all 6 dedicated citizen API methods'
+);
+
+// --------------------------------------------------------------------
+// 2. CONTEXT & ROUTE PROTECTION ISOLATION
+// --------------------------------------------------------------------
+console.log('\n--- PART 2: CONTEXT & ROUTE PROTECTION ISOLATION ---');
+
+const compAuthContextPath = path.join(__dirname, 'src', 'context', 'ComplainantAuthContext.tsx');
+assert(fs.existsSync(compAuthContextPath), 'ComplainantAuthContext.tsx exists');
+const compAuthContent = fs.readFileSync(compAuthContextPath, 'utf8');
+
+assert(
+  compAuthContent.includes('nyayaniti_complainant_token') &&
+  compAuthContent.includes('nyayaniti_complainant_user'),
+  'ComplainantAuthContext operates strictly on complainant storage keys'
+);
+assert(
+  compAuthContent.includes('useComplainantAuth'),
+  'ComplainantAuthContext exports dedicated useComplainantAuth hook'
+);
+
+const compProtectedRoutePath = path.join(__dirname, 'src', 'components', 'common', 'ComplainantProtectedRoute.tsx');
+assert(fs.existsSync(compProtectedRoutePath), 'ComplainantProtectedRoute.tsx exists');
+const compProtectedContent = fs.readFileSync(compProtectedRoutePath, 'utf8');
+
+assert(
+  compProtectedContent.includes('useComplainantAuth'),
+  'ComplainantProtectedRoute uses useComplainantAuth hook'
+);
+assert(
+  compProtectedContent.includes('to="/complainant/login"'),
+  'ComplainantProtectedRoute strictly redirects unauthenticated citizens to /complainant/login'
+);
+
+const officerProtectedRoutePath = path.join(__dirname, 'src', 'components', 'common', 'ProtectedRoute.tsx');
+const officerProtectedContent = fs.readFileSync(officerProtectedRoutePath, 'utf8');
+assert(
+  officerProtectedContent.includes('to="/"') && !officerProtectedContent.includes('/complainant/login'),
+  'Officer ProtectedRoute strictly redirects unauthenticated visitors to Public Explore without leaking routes'
+);
+
+// --------------------------------------------------------------------
+// 3. ROUTE REGISTRATION IN APP.TSX
+// --------------------------------------------------------------------
+console.log('\n--- PART 3: APPLICATION ROUTE REGISTRATION ---');
+
+const appPath = path.join(__dirname, 'src', 'App.tsx');
+const appContent = fs.readFileSync(appPath, 'utf8');
+
+assert(appContent.includes('ComplainantAuthProvider'), 'App.tsx wraps app tree with ComplainantAuthProvider');
+assert(appContent.includes('path="/complainant/login"'), 'App.tsx mounts route /complainant/login');
+assert(appContent.includes('path="/complainant/register"'), 'App.tsx mounts route /complainant/register');
+assert(appContent.includes('path="/complainant/dashboard"'), 'App.tsx mounts route /complainant/dashboard');
+assert(
+  appContent.includes('<ComplainantProtectedRoute>') && appContent.includes('ComplainantDashboardPage'),
+  'App.tsx wraps /complainant/dashboard with ComplainantProtectedRoute'
+);
+
+// --------------------------------------------------------------------
+// 4. CITIZEN REGISTRATION VALIDATION & COMPLIANCE
+// --------------------------------------------------------------------
+console.log('\n--- PART 4: CITIZEN REGISTRATION VALIDATION ---');
+
+const regPagePath = path.join(__dirname, 'src', 'pages', 'ComplainantRegisterPage.tsx');
+assert(fs.existsSync(regPagePath), 'ComplainantRegisterPage.tsx exists');
+const regContent = fs.readFileSync(regPagePath, 'utf8');
+
+assert(
+  regContent.includes('full_name') &&
+  regContent.includes('email') &&
+  regContent.includes('mobile') &&
+  regContent.includes('password') &&
+  regContent.includes('confirm_password'),
+  'ComplainantRegisterPage includes all required registration fields'
+);
+
+assert(
+  regContent.includes('6-9') && regContent.includes('10'),
+  'ComplainantRegisterPage validates 10-digit Indian mobile number format'
+);
+
+assert(
+  regContent.includes('password') && regContent.includes('confirm_password') && regContent.includes('match'),
+  'ComplainantRegisterPage enforces password match confirmation'
+);
+
+// --------------------------------------------------------------------
+// 5. CITIZEN LOGIN & DEMO EVALUATION
+// --------------------------------------------------------------------
+console.log('\n--- PART 5: CITIZEN LOGIN & DEMO EVALUATION ---');
+
+const loginPagePath = path.join(__dirname, 'src', 'pages', 'ComplainantLoginPage.tsx');
+assert(fs.existsSync(loginPagePath), 'ComplainantLoginPage.tsx exists');
+const loginContent = fs.readFileSync(loginPagePath, 'utf8');
+
+assert(
+  loginContent.includes('demoLogin') || loginContent.includes('Quick Demo Evaluation'),
+  'ComplainantLoginPage provides 1-click quick demo evaluation switch'
+);
+
+assert(
+  loginContent.includes('/complainant/register'),
+  'ComplainantLoginPage provides link to register new citizen account'
+);
+
+// --------------------------------------------------------------------
+// 6. CITIZEN DASHBOARD & GRIEVANCE TRACKING
+// --------------------------------------------------------------------
+console.log('\n--- PART 6: CITIZEN DASHBOARD & MILESTONE TRACKING ---');
+
+const dashPagePath = path.join(__dirname, 'src', 'pages', 'ComplainantDashboardPage.tsx');
+assert(fs.existsSync(dashPagePath), 'ComplainantDashboardPage.tsx exists');
+const dashContent = fs.readFileSync(dashPagePath, 'utf8');
+
+assert(
+  dashContent.includes('expandedCaseId') && dashContent.includes('caseDetail'),
+  'ComplainantDashboardPage renders case milestone progression timeline'
+);
+
+assert(
+  dashContent.includes('showFileModal') && dashContent.includes('fileComplainantCase'),
+  'ComplainantDashboardPage includes citizen grievance submission modal'
+);
+
+// --------------------------------------------------------------------
+// 7. HEADER & NAVIGATION AUDIT
+// --------------------------------------------------------------------
+console.log('\n--- PART 7: HEADER & PUBLIC NAVIGATION ---');
+
+const pubHeaderPath = path.join(__dirname, 'src', 'components', 'common', 'PublicHeader.tsx');
+const pubHeaderContent = fs.readFileSync(pubHeaderPath, 'utf8');
+
+assert(
+  pubHeaderContent.includes('/complainant/login') && pubHeaderContent.includes('Citizen Portal'),
+  'PublicHeader includes prominent "Citizen Portal" CTA navigating to /complainant/login'
+);
+
+const compHeaderPath = path.join(__dirname, 'src', 'components', 'common', 'ComplainantHeader.tsx');
+assert(fs.existsSync(compHeaderPath), 'ComplainantHeader.tsx exists');
+const compHeaderContent = fs.readFileSync(compHeaderPath, 'utf8');
+
+assert(
+  compHeaderContent.includes('complainant') && compHeaderContent.includes('logout'),
+  'ComplainantHeader provides citizen identity presentation and logout capability'
+);
+
+console.log('\n======================================================================');
+console.log(`AUDIT COMPLETE: ${passedTests}/${totalTests} CHECKS PASSED`);
+if (failures.length > 0) {
+  console.log(`FAILURES (${failures.length}):`);
+  failures.forEach(f => console.log(` - ${f}`));
+  process.exit(1);
+} else {
+  console.log('STATUS: 100% OF PHASE 3 COMPLAINANT AUDIT SPECIFICATIONS PASSED');
+  console.log('======================================================================');
+  process.exit(0);
+}

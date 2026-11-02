@@ -26,13 +26,22 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception:
         return False
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: dict,
+    expires_delta: Optional[timedelta] = None,
+    audience: str = "nyayaniti-officer",
+    token_type: str = "officer_access"
+) -> str:
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp": expire,
+        "aud": audience,
+        "token_type": token_type
+    })
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def get_current_user(
@@ -47,10 +56,23 @@ def get_current_user(
         )
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_aud": False})
         username: str = payload.get("sub")
+        token_type = payload.get("token_type")
+        aud = payload.get("aud")
+        role = payload.get("role")
+        
+        # STRICT ISOLATION: Prevent complainant tokens from accessing internal officer endpoints
+        if role == "complainant" or token_type == "complainant_access" or aud == "nyayaniti-complainant":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Complainant credentials cannot access internal administrative officer endpoints."
+            )
+        
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
+    except HTTPException:
+        raise
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
         
@@ -67,8 +89,15 @@ def get_current_user_optional(
         return None
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_aud": False})
         username: str = payload.get("sub")
+        token_type = payload.get("token_type")
+        aud = payload.get("aud")
+        role = payload.get("role")
+        
+        if role == "complainant" or token_type == "complainant_access" or aud == "nyayaniti-complainant":
+            return None
+            
         if not username:
             return None
         return db.query(User).filter(User.username == username, User.is_active == True).first()
@@ -96,7 +125,11 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Account is deactivated")
         
-    token = create_access_token(data={"sub": user.username, "role": user.role, "bureau_id": user.bureau_id})
+    token = create_access_token(
+        data={"sub": user.username, "role": user.role, "bureau_id": user.bureau_id},
+        audience="nyayaniti-officer",
+        token_type="officer_access"
+    )
     
     log_audit_event(
         db=db,
@@ -142,7 +175,11 @@ def demo_login(role: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail=f"No active demo account found for role {role}")
         
-    token = create_access_token(data={"sub": user.username, "role": user.role, "bureau_id": user.bureau_id})
+    token = create_access_token(
+        data={"sub": user.username, "role": user.role, "bureau_id": user.bureau_id},
+        audience="nyayaniti-officer",
+        token_type="officer_access"
+    )
     
     log_audit_event(
         db=db,

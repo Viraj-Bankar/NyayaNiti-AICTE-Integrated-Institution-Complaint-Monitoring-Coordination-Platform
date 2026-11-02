@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LogIn } from 'lucide-react';
+import { LogIn, User } from 'lucide-react';
 
 /**
  * PublicHeader:
@@ -11,12 +11,10 @@ import { LogIn } from 'lucide-react';
  * - AICTE logo / emblem
  * - NyayaNiti logo & branding
  * RIGHT:
- * - Login button
+ * - Citizen Portal button
+ * - Officer Login button
  *
- * Strictly NO operational or administrative elements:
- * No Dashboard, Case Register, Overlap Center, Action Conflicts, Coordination,
- * Institutions, Validation Engine, Surge Detection, Reports, SUPER ADMIN,
- * Current Role, Logout, or Authority navigation.
+ * Strictly NO internal administrative operational tabs.
  */
 export const PublicHeader: React.FC = () => {
   const location = useLocation();
@@ -52,12 +50,22 @@ export const PublicHeader: React.FC = () => {
           </div>
         </Link>
 
-        {/* RIGHT: Login Button */}
-        <div className="flex items-center gap-3">
+        {/* RIGHT: Citizen Portal + Officer Login Buttons */}
+        <div className="flex items-center gap-2.5">
+          <Link
+            to="/complainant/login"
+            className="btn-3d-white px-3 sm:px-4 py-2 rounded text-xs tracking-wide font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs text-[#061E46]"
+            title="Citizen Grievance & Tracking Portal"
+          >
+            <User className="w-3.5 h-3.5 text-[#1E5AA8]" />
+            <span className="hidden sm:inline">Citizen Portal</span>
+            <span className="sm:hidden">Citizen</span>
+          </Link>
+
           <Link
             to="/login"
             state={location.state}
-            className="btn-3d-amber px-4 sm:px-5 py-2 rounded text-xs tracking-wide font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+            className="btn-3d-amber px-3.5 sm:px-5 py-2 rounded text-xs tracking-wide font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
             title="Official Authorized Officer Access"
           >
             <LogIn className="w-3.5 h-3.5" />
@@ -70,4 +78,3 @@ export const PublicHeader: React.FC = () => {
 };
 
 export default PublicHeader;
-

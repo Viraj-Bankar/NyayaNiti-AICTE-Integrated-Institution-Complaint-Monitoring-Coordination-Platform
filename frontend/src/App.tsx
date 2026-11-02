@@ -1,11 +1,13 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ComplainantAuthProvider } from './context/ComplainantAuthContext';
 import { GovTopBar } from './components/common/GovTopBar';
 import { GovHeader } from './components/common/GovHeader';
 import { GovNavBar } from './components/common/GovNavBar';
 import { GovFooter } from './components/common/GovFooter';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { ComplainantProtectedRoute } from './components/common/ComplainantProtectedRoute';
 
 import { LandingPage } from './pages/LandingPage';
 import { ExplorePage } from './pages/ExplorePage';
@@ -23,6 +25,9 @@ import { ReportsPage } from './pages/ReportsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { LoginPage } from './pages/LoginPage';
+import { ComplainantLoginPage } from './pages/ComplainantLoginPage';
+import { ComplainantRegisterPage } from './pages/ComplainantRegisterPage';
+import { ComplainantDashboardPage } from './pages/ComplainantDashboardPage';
 
 /**
  * RootRoute:
@@ -46,23 +51,44 @@ const RootRoute: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <div className="min-h-screen flex flex-col bg-[#F4F6F9] text-slate-800">
-          <GovTopBar />
-          <GovHeader />
-          <GovNavBar />
-          
-          <main className="flex-1">
-            <Routes>
-              {/* Public Routes */}
-              {/* Root URL: Public Explore for visitors; Operational Home for authenticated officers */}
-              <Route path="/" element={<RootRoute />} />
+      <ComplainantAuthProvider>
+        <BrowserRouter>
+          <div className="min-h-screen flex flex-col bg-[#F4F6F9] text-slate-800">
+            <GovTopBar />
+            <GovHeader />
+            <GovNavBar />
+            
+            <main className="flex-1">
+              <Routes>
+                {/* Public Routes */}
+                {/* Root URL: Public Explore for visitors; Operational Home for authenticated officers */}
+                <Route path="/" element={<RootRoute />} />
 
-              {/* Dedicated Public Explore Route */}
-              <Route path="/explore" element={<ExplorePage />} />
+                {/* Dedicated Public Explore Route */}
+                <Route path="/explore" element={<ExplorePage />} />
 
-              {/* Officer Login Route */}
-              <Route path="/login" element={<LoginPage />} />
+                {/* Officer Login Route */}
+                <Route path="/login" element={<LoginPage />} />
+
+                {/* Citizen / Complainant Portal Routes */}
+                <Route path="/complainant/login" element={<ComplainantLoginPage />} />
+                <Route path="/complainant/register" element={<ComplainantRegisterPage />} />
+                <Route
+                  path="/complainant/dashboard"
+                  element={
+                    <ComplainantProtectedRoute>
+                      <ComplainantDashboardPage />
+                    </ComplainantProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/complainant/cases/:id"
+                  element={
+                    <ComplainantProtectedRoute>
+                      <ComplainantDashboardPage />
+                    </ComplainantProtectedRoute>
+                  }
+                />
 
               {/* Protected Authority Routes */}
               <Route
@@ -207,6 +233,7 @@ export const App: React.FC = () => {
           <GovFooter />
         </div>
       </BrowserRouter>
+      </ComplainantAuthProvider>
     </AuthProvider>
   );
 };

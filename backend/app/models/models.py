@@ -37,6 +37,24 @@ class User(Base):
     bureau = relationship("Bureau", back_populates="users")
     assigned_cases = relationship("Case", back_populates="assigned_officer", foreign_keys="Case.assigned_officer_id")
 
+class Complainant(Base):
+    __tablename__ = "complainants"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String(200), nullable=False)
+    email = Column(String(200), unique=True, index=True, nullable=False)
+    mobile = Column(String(20), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_email_verified = Column(Boolean, default=False)
+    is_mobile_verified = Column(Boolean, default=False)
+    complainant_type = Column(String(50), default="Student")  # 'Student', 'Faculty', 'Parent', 'Citizen'
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    cases = relationship("Case", back_populates="complainant")
+
 class Institution(Base):
     __tablename__ = "institutions"
     
@@ -103,6 +121,7 @@ class Case(Base):
     status = Column(String(50), default="Pending", index=True)  # 'Pending', 'Under Process', 'Disposed', 'Transferred', 'Escalated'
     current_bureau_id = Column(Integer, ForeignKey("bureaus.id"), nullable=False, index=True)
     assigned_officer_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    complainant_id = Column(Integer, ForeignKey("complainants.id"), nullable=True, index=True)
     priority = Column(String(50), default="Medium", index=True)  # 'Critical', 'High', 'Medium', 'Low'
     priority_score = Column(Float, default=50.0)
     priority_factors = Column(JSON, nullable=True)
@@ -126,6 +145,7 @@ class Case(Base):
     institution = relationship("Institution", back_populates="cases")
     current_bureau = relationship("Bureau", back_populates="cases")
     assigned_officer = relationship("User", back_populates="assigned_cases", foreign_keys=[assigned_officer_id])
+    complainant = relationship("Complainant", back_populates="cases")
     events = relationship("CaseEvent", back_populates="case", cascade="all, delete-orphan", order_by="CaseEvent.timestamp.desc()")
     documents = relationship("DocumentMetadata", back_populates="case", cascade="all, delete-orphan")
 

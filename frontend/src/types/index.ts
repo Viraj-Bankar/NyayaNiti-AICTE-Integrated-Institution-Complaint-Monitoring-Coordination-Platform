@@ -225,3 +225,52 @@ export interface AuditLogItem {
   ip_address?: string;
   timestamp: string;
 }
+
+export interface Complainant {
+  id: number;
+  full_name: string;
+  email: string;
+  mobile: string;
+  is_active?: boolean;
+  is_email_verified?: boolean;
+  is_mobile_verified?: boolean;
+  complainant_type?: string;
+  created_at?: string;
+}
+
+export interface ComplainantRegisterData {
+  full_name: string;
+  email: string;
+  mobile: string;
+  password: string;
+  confirm_password: string;
+  complainant_type?: string;
+}
+
+export interface ComplainantCaseItem {
+  id: string;
+  institution_id: number;
+  institution_name: string;
+  permanent_id: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  date_received: string;
+  status: string;
+  bureau_code: string;
+  last_action?: string;
+  last_action_date?: string;
+  prescribed_deadline: string;
+  created_at: string;
+}
+
+export interface ComplainantCaseMilestone {
+  event_type: string;
+  remarks?: string;
+  timestamp: string;
+}
+
+export interface ComplainantCaseDetail extends ComplainantCaseItem {
+  events: ComplainantCaseMilestone[];
+}
+

@@ -1,16 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.database import engine, Base, SessionLocal
+from app.database import engine, Base, SessionLocal, ensure_schema
 from app.api import (
     auth, institutions, cases, overlaps, action_conflicts,
     coordination, dashboard, surges, reports, notifications,
-    audit, documents, settings as admin_settings
+    audit, documents, settings as admin_settings,
+    complainant_auth, complainant_cases
 )
 from app.seed_data import seed_database
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Ensure database tables and schema columns
+ensure_schema()
 
 app = FastAPI(
     title="NyayaNiti — AICTE Integrated Institution Complaint Monitoring & Coordination Platform",
@@ -39,7 +40,7 @@ def on_startup():
     finally:
         db.close()
 
-# Include routers
+# Include routers - Internal Operational & Officer
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
 app.include_router(cases.router, prefix=settings.API_V1_PREFIX)
@@ -53,6 +54,10 @@ app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit.router, prefix=settings.API_V1_PREFIX)
 app.include_router(documents.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin_settings.router, prefix=settings.API_V1_PREFIX)
+
+# Include routers - Citizen & Complainant Space
+app.include_router(complainant_auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(complainant_cases.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():

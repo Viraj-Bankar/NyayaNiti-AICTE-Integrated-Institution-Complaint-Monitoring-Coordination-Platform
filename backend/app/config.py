@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     )
     API_V1_PREFIX: str = "/api"
 
-    SECRET_KEY: str = ""
+    SECRET_KEY: str = "nyayaniti-dev-secret-key-32chars-minimum-fallback"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     SLA_LOW_DAYS: int = 45
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         extra="ignore",
     )

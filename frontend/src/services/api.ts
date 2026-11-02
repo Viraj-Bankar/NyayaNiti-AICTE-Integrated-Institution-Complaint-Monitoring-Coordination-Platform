@@ -1,7 +1,8 @@
 import {
   User, CaseItem, Institution, OverlapAlert, ActionConflictAlert,
   CoordinationWorkspace, DashboardKpis, AlertTickerItem, NotificationItem,
-  AuditLogItem, DocumentItem
+  AuditLogItem, DocumentItem, Complainant, ComplainantRegisterData,
+  ComplainantCaseItem, ComplainantCaseDetail
 } from '../types';
 
 /**
@@ -45,6 +46,17 @@ export function buildApiUrl(path: string, params?: Record<string, any>): string 
 
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('nyayaniti_token');
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+function getComplainantAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem('nyayaniti_complainant_token');
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -455,6 +467,65 @@ export const api = {
     const res = await fetch(`${API_BASE}/settings/users/${userId}/toggle-status`, {
       method: 'PATCH',
       headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // ============================================================
+  // CITIZEN & COMPLAINANT PORTAL APIS
+  // ============================================================
+  async complainantRegister(data: ComplainantRegisterData): Promise<Complainant> {
+    const res = await fetch(`${API_BASE}/complainant/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+
+  async complainantLogin(email: string, password: string): Promise<{ access_token: string; token_type: string; complainant: Complainant }> {
+    const res = await fetch(`${API_BASE}/complainant/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    return handleResponse(res);
+  },
+
+  async complainantDemoLogin(): Promise<{ access_token: string; token_type: string; complainant: Complainant }> {
+    const res = await fetch(`${API_BASE}/complainant/auth/demo-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantMe(): Promise<Complainant> {
+    const res = await fetch(`${API_BASE}/complainant/auth/me`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantCases(): Promise<ComplainantCaseItem[]> {
+    const res = await fetch(`${API_BASE}/complainant/cases`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplainantCaseDetail(caseId: string): Promise<ComplainantCaseDetail> {
+    const res = await fetch(`${API_BASE}/complainant/cases/${caseId}`, {
+      headers: getComplainantAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async fileComplainantCase(payload: { institution_id: number; category: string; subcategory?: string; description: string }): Promise<ComplainantCaseItem> {
+    const res = await fetch(`${API_BASE}/complainant/cases`, {
+      method: 'POST',
+      headers: getComplainantAuthHeaders(),
+      body: JSON.stringify(payload)
     });
     return handleResponse(res);
   }

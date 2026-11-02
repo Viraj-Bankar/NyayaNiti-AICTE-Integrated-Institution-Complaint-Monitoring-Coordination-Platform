@@ -162,6 +162,21 @@ export const GovFooter: React.FC = () => {
               </Link>
             </div>
 
+            <div className="p-2.5 rounded bg-slate-800/60 border border-slate-700 space-y-1.5">
+              <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">
+                Citizen Grievance Portal
+              </span>
+              <p className="text-[11px] text-slate-300 leading-snug">
+                Submit and track complaints filed with AICTE bureaus.
+              </p>
+              <Link
+                to="/complainant/login"
+                className="btn-3d-white px-2.5 py-1 rounded text-[10px] font-bold inline-flex items-center gap-1.5 text-[#061E46] cursor-pointer shadow-xs"
+              >
+                <span>Citizen Sign In / Register</span>
+              </Link>
+            </div>
+
             <ul className="space-y-1.5 text-[11px] text-slate-400 pt-1">
               <li>
                 <a

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import random
 from sqlalchemy.orm import Session
 from app.models.models import (
-    Bureau, User, Institution, InstitutionAlias, Case, CaseEvent,
+    Bureau, User, Complainant, Institution, InstitutionAlias, Case, CaseEvent,
     OverlapAlert, ActionConflictAlert, CoordinationWorkspace,
     CoordinationParticipant, CoordinationTask, CaseCoordinationLink,
     Notification, DocumentMetadata, AuditLog
@@ -10,10 +10,36 @@ from app.models.models import (
 from app.api.auth import hash_password
 from app.services.matching_engine import compute_similarity
 
+def seed_complainants(db: Session):
+    demo_comp = db.query(Complainant).filter(Complainant.email == "student.demo@nyayaniti.gov.in").first()
+    if not demo_comp:
+        demo_comp = Complainant(
+            full_name="Rahul Verma (Demo Student)",
+            email="student.demo@nyayaniti.gov.in",
+            mobile="9876543210",
+            hashed_password=hash_password("student123"),
+            is_active=True,
+            is_email_verified=True,
+            is_mobile_verified=True,
+            complainant_type="Student"
+        )
+        db.add(demo_comp)
+        db.commit()
+        db.refresh(demo_comp)
+        
+        # Link 2 sample complaints to this demo complainant
+        sample_cases = db.query(Case).limit(2).all()
+        for c in sample_cases:
+            c.complainant_id = demo_comp.id
+        db.commit()
+
 def seed_database(db: Session):
+    # Ensure demo complainant is available
+    seed_complainants(db)
+
     # Check if already seeded
     if db.query(Institution).first():
-        print("Database already contains records. Skipping seed.")
+        print("Database already contains records. Skipping full seed.")
         return
 
     print("Seeding synthetic Indian institutional grievance data for AICTE NyayaNiti...")

@@ -350,3 +350,75 @@ class AlertTickerItem(BaseModel):
     severity: str
     created_at: datetime
     link_url: str
+
+# Complainant Schemas
+class ComplainantRegister(BaseModel):
+    full_name: str
+    email: EmailStr
+    mobile: str
+    password: str
+    confirm_password: str
+    complainant_type: Optional[str] = "Student"
+
+class ComplainantLogin(BaseModel):
+    email: str
+    password: str
+
+class ComplainantResponse(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    mobile: str
+    is_active: bool
+    is_email_verified: bool
+    is_mobile_verified: bool
+    complainant_type: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ComplainantToken(BaseModel):
+    access_token: str
+    token_type: str
+    complainant: Dict[str, Any]
+
+class ComplainantCaseCreate(BaseModel):
+    institution_id: int
+    category: str
+    subcategory: Optional[str] = None
+    description: str
+
+class ComplainantCaseResponse(BaseModel):
+    id: str
+    institution_id: int
+    institution_name: str
+    permanent_id: str
+    category: str
+    subcategory: Optional[str] = None
+    description: str
+    date_received: datetime
+    status: str
+    bureau_code: str
+    last_action: Optional[str] = None
+    last_action_date: Optional[datetime] = None
+    prescribed_deadline: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ComplainantCaseEventItem(BaseModel):
+    event_type: str
+    remarks: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class ComplainantCaseDetailResponse(ComplainantCaseResponse):
+    events: List[ComplainantCaseEventItem] = []
+
+    class Config:
+        from_attributes = True
+
