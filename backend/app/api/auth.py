@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta
 from typing import Optional, List
 import jwt
@@ -125,7 +126,14 @@ def demo_login(role: str, db: Session = Depends(get_db)):
     """
     Dedicated development quick-switch for administrative evaluation.
     Allowed roles: 'super_admin', 'authorized_officer', 'bureau_head', 'monitoring_officer'
+    Strictly disabled in production environments to prevent privilege escalation and unauthorized admin access.
     """
+    if os.getenv("APP_ENV", "development").lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Demo evaluation authentication is strictly disabled in production. Official officers must authenticate via /api/auth/login with assigned credentials."
+        )
+
     valid_roles = ["super_admin", "authorized_officer", "bureau_head", "monitoring_officer"]
     if role not in valid_roles:
         raise HTTPException(status_code=400, detail=f"Invalid demo role. Allowed: {valid_roles}")

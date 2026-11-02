@@ -61,6 +61,19 @@ def run_tests():
     monitor_token = res_monitor.json().get("access_token")
     monitor_headers = {"Authorization": f"Bearer {monitor_token}"}
 
+    # 5b. Demo login strictly forbidden in production environment
+    import os
+    orig_env = os.environ.get("APP_ENV")
+    try:
+        os.environ["APP_ENV"] = "production"
+        res_prod_demo = client.post("/api/auth/demo-login/super_admin")
+        assert_test("Demo Login Blocked in Production (HTTP 403)", res_prod_demo.status_code == 403)
+    finally:
+        if orig_env is not None:
+            os.environ["APP_ENV"] = orig_env
+        else:
+            os.environ.pop("APP_ENV", None)
+
     # 6. Protected Endpoint /api/auth/me Verification
     res_me_admin = client.get("/api/auth/me", headers=admin_headers)
     assert_test("Auth Profile /api/auth/me with Admin Bearer", res_me_admin.status_code == 200 and res_me_admin.json()["role"] == "super_admin")
