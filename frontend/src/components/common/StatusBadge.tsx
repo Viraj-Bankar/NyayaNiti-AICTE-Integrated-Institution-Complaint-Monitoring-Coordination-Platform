@@ -23,8 +23,20 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, type = 'status
   } else if (type === 'status') {
     if (s === 'pending') {
       colorClasses = 'bg-amber-50 text-amber-900 border-amber-300';
-    } else if (s === 'under process') {
-      colorClasses = 'bg-blue-50 text-blue-800 border-blue-300';
+    } else if (s === 'submitted') {
+      colorClasses = 'bg-sky-50 text-sky-800 border-sky-300 font-semibold';
+    } else if (s === 'under review') {
+      colorClasses = 'bg-indigo-50 text-indigo-800 border-indigo-300 font-semibold';
+    } else if (s === 'under process' || s === 'in progress') {
+      colorClasses = 'bg-blue-50 text-blue-800 border-blue-300 font-semibold';
+    } else if (s === 'additional information required') {
+      colorClasses = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold';
+    } else if (s === 'resolved') {
+      colorClasses = 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold';
+    } else if (s === 'closed') {
+      colorClasses = 'bg-slate-100 text-slate-800 border-slate-300 font-medium';
+    } else if (s === 'rejected') {
+      colorClasses = 'bg-rose-50 text-rose-800 border-rose-300 font-semibold';
     } else if (s === 'disposed') {
       colorClasses = 'bg-emerald-50 text-emerald-800 border-emerald-300';
     } else if (s === 'transferred') {

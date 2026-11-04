@@ -6,11 +6,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, func
 from app.database import get_db
 from app.models.models import (
-    Case, CaseEvent, User, Bureau, Institution, OverlapAlert, ActionConflictAlert, Notification
+    Case, CaseEvent, User, Bureau, Institution, OverlapAlert, ActionConflictAlert, Notification,
+    CaseAssignment, Complainant, CaseRelationship
 )
 from app.schemas.schemas import (
     CaseResponse, CaseDetailResponse, CaseCreate, CaseUpdate, PriorityOverrideRequest,
-    CaseInternalNoteRequest
+    CaseInternalNoteRequest, CaseAssignmentRequest, CaseAssignmentResponse, UserResponse,
+    CaseRelationshipResponse, CaseLinkRequest
 )
 from app.api.auth import get_current_user, require_role
 from app.services.audit_service import log_audit_event, record_case_event
@@ -80,6 +82,7 @@ def list_cases(
     bureau_id: Optional[int] = None,
     institution_id: Optional[int] = None,
     citizen_only: Optional[bool] = False,
+    unassigned_only: Optional[bool] = False,
     overdue_only: Optional[bool] = False,
     sort_by: Optional[str] = "date_received",
     order: Optional[str] = "desc",
@@ -110,11 +113,13 @@ def list_cases(
         query = query.filter(Case.institution_id == institution_id)
     if citizen_only:
         query = query.filter(Case.complainant_id != None)
+    if unassigned_only:
+        query = query.filter(Case.assigned_officer_id == None)
     if overdue_only:
         now = datetime.utcnow()
         query = query.filter(
             Case.prescribed_deadline < now,
-            Case.status.in_(["Pending", "Under Process", "Escalated", "Submitted", "Under Review", "In Progress"])
+            Case.status.in_(["Pending", "Under Process", "Escalated", "Submitted", "Under Review", "In Progress", "Additional Information Required"])
         )
         
     # Sort
@@ -133,6 +138,20 @@ def list_cases(
         
     cases = query.offset(skip).limit(limit).all()
     return [serialize_case(c) for c in cases]
+
+@router.get("/officers/available", response_model=List[UserResponse])
+def get_available_officers(
+    bureau_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List active officers available for grievance assignment.
+    """
+    query = db.query(User).filter(User.is_active == True)
+    if bureau_id:
+        query = query.filter(User.bureau_id == bureau_id)
+    return query.order_by(User.full_name.asc()).all()
 
 @router.get("/{id}", response_model=CaseDetailResponse)
 def get_case_detail(
@@ -166,15 +185,83 @@ def get_case_detail(
             "id": d.id,
             "case_id": d.case_id,
             "file_name": d.file_name,
+            "original_filename": d.original_filename or d.file_name,
             "file_size": d.file_size,
             "file_type": d.file_type,
             "category": d.category,
             "access_classification": d.access_classification,
             "uploaded_by_id": d.uploaded_by_id,
+            "uploaded_by_complainant_id": d.uploaded_by_complainant_id,
+            "uploader_role": d.uploader_role,
+            "download_url": f"/api/documents/{d.id}/download",
             "upload_timestamp": d.upload_timestamp
         }
         for d in c.documents
     ]
+    
+    # Assignments history
+    data["assignments"] = [
+        {
+            "id": a.id,
+            "case_id": a.case_id,
+            "from_officer_id": a.from_officer_id,
+            "from_officer_name": a.from_officer.full_name if a.from_officer else None,
+            "to_officer_id": a.to_officer_id,
+            "to_officer_name": a.to_officer.full_name if a.to_officer else "Assigned Officer",
+            "assigned_by_id": a.assigned_by_id,
+            "assigned_by_name": a.assigned_by.full_name if a.assigned_by else "Admin",
+            "bureau_id": a.bureau_id,
+            "bureau_code": a.bureau.code if a.bureau else "PGRC",
+            "remarks": a.remarks,
+            "assigned_at": a.assigned_at
+        }
+        for a in (c.assignments or [])
+    ]
+    
+    # Complainant profile for authenticated officers
+    if c.complainant_id:
+        comp = db.query(Complainant).filter(Complainant.id == c.complainant_id).first()
+        if comp:
+            data["complainant_details"] = {
+                "id": comp.id,
+                "full_name": comp.full_name,
+                "email": comp.email,
+                "mobile": comp.mobile,
+                "complainant_type": comp.complainant_type,
+                "is_email_verified": comp.is_email_verified,
+                "is_mobile_verified": comp.is_mobile_verified,
+                "created_at": comp.created_at
+            }
+        else:
+            data["complainant_details"] = None
+    else:
+        data["complainant_details"] = None
+
+    # Linked & Consolidated matters
+    relationships = db.query(CaseRelationship).filter(
+        (CaseRelationship.case_a_id == c.id) | (CaseRelationship.case_b_id == c.id)
+    ).all()
+    
+    linked_list = []
+    for rel in relationships:
+        other_case_id = rel.case_b_id if rel.case_a_id == c.id else rel.case_a_id
+        other_case = db.query(Case).filter(Case.id == other_case_id).first()
+        linked_list.append({
+            "id": rel.id,
+            "case_a_id": rel.case_a_id,
+            "case_b_id": rel.case_b_id,
+            "related_case_id": other_case_id,
+            "relationship_type": rel.relationship_type,
+            "status": rel.status,
+            "similarity_score": rel.similarity_score,
+            "title": (getattr(other_case, "title", None) or other_case.category) if other_case else "N/A",
+            "institution_name": other_case.institution.official_name if (other_case and other_case.institution) else "Unknown",
+            "case_status": other_case.status if other_case else "Unknown",
+            "remarks": rel.review_remarks,
+            "created_at": rel.created_at
+        })
+    data["linked_cases"] = linked_list
+
     return data
 
 @router.post("", response_model=CaseResponse)
@@ -402,6 +489,36 @@ def update_case(
         new_officer = db.query(User).filter(User.id == update_data.assigned_officer_id).first()
         prev_name = c.assigned_officer.full_name if c.assigned_officer else "None"
         new_name = new_officer.full_name if new_officer else "Unknown"
+        
+        # Operationalize CaseAssignment record
+        if new_officer:
+            assignment_entry = CaseAssignment(
+                case_id=c.id,
+                from_officer_id=c.assigned_officer_id,
+                to_officer_id=new_officer.id,
+                assigned_by_id=current_user.id,
+                bureau_id=new_officer.bureau_id or c.current_bureau_id,
+                remarks=update_data.remarks or f"Reassigned responsibility to {new_name}",
+                assigned_at=datetime.utcnow()
+            )
+            db.add(assignment_entry)
+            
+            # Send notification to newly assigned officer
+            assigned_notif = Notification(
+                recipient_id=new_officer.id,
+                complainant_id=None,
+                notification_type="CASE_ASSIGNED",
+                related_case_id=c.id,
+                related_entity_type="Case",
+                related_entity_id=c.id,
+                title="Case Allocated to You",
+                message=f"Case {c.id} ({c.category}) has been assigned to you by {current_user.full_name}.",
+                severity="High",
+                is_read=False,
+                link_url=f"/cases/{c.id}"
+            )
+            db.add(assigned_notif)
+
         record_case_event(
             db=db,
             case_id=c.id,
@@ -601,3 +718,229 @@ def escalate_case(
     db.commit()
     db.refresh(c)
     return serialize_case(c)
+
+@router.post("/{id}/assign", response_model=CaseResponse)
+def assign_case_to_officer(
+    id: str,
+    assign_req: CaseAssignmentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Dedicated officer intake triage and case assignment endpoint.
+    Creates an immutable CaseAssignment record, logs an assignment CaseEvent,
+    updates assigned officer, advances 'Submitted' status to 'Under Review',
+    and dispatches a notification to the assigned officer.
+    """
+    c = db.query(Case).filter(Case.id == id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Case record not found")
+
+    target_officer = db.query(User).filter(
+        User.id == assign_req.to_officer_id,
+        User.is_active == True
+    ).first()
+    if not target_officer:
+        raise HTTPException(status_code=404, detail="Selected officer not found or account deactivated")
+
+    # Permission check: super_admin, bureau_head, or authorized_officer
+    if current_user.role not in ["super_admin", "bureau_head", "authorized_officer"]:
+        raise HTTPException(status_code=403, detail="Unauthorized to assign cases")
+
+    prev_officer_id = c.assigned_officer_id
+    prev_name = c.assigned_officer.full_name if c.assigned_officer else "Unassigned (Intake Queue)"
+    new_name = target_officer.full_name
+
+    # Create CaseAssignment record
+    assignment_entry = CaseAssignment(
+        case_id=c.id,
+        from_officer_id=prev_officer_id,
+        to_officer_id=target_officer.id,
+        assigned_by_id=current_user.id,
+        bureau_id=target_officer.bureau_id or c.current_bureau_id,
+        remarks=assign_req.remarks or f"Assigned to {new_name} by {current_user.full_name}",
+        assigned_at=datetime.utcnow()
+    )
+    db.add(assignment_entry)
+
+    # Update Case
+    c.assigned_officer_id = target_officer.id
+    status_changed = False
+    prev_status = c.status
+
+    # If case was in 'Submitted' (Intake Queue), automatically advance to 'Under Review'
+    if c.status == "Submitted":
+        c.status = "Under Review"
+        status_changed = True
+
+    c.updated_at = datetime.utcnow()
+
+    # Record Timeline CaseEvent
+    record_case_event(
+        db=db,
+        case_id=c.id,
+        event_type="ASSIGNED",
+        actor_id=current_user.id,
+        actor_name=current_user.full_name,
+        previous_value=prev_name,
+        new_value=new_name,
+        remarks=assign_req.remarks or f"Assigned to {new_name} for official review",
+        is_public=False
+    )
+
+    if status_changed:
+        record_case_event(
+            db=db,
+            case_id=c.id,
+            event_type="STATUS_CHANGE",
+            actor_id=current_user.id,
+            actor_name=current_user.full_name,
+            previous_value=prev_status,
+            new_value="Under Review",
+            remarks="Case officially accepted from Intake Queue for administrative review",
+            is_public=True
+        )
+        if c.complainant_id:
+            c_notif = Notification(
+                recipient_id=None,
+                complainant_id=c.complainant_id,
+                notification_type="STATUS_UPDATE",
+                related_case_id=c.id,
+                title="Complaint Under Review",
+                message=f"Your complaint {c.id} has been accepted from intake and assigned for review.",
+                severity="Info",
+                link_url=f"/complainant/cases/{c.id}"
+            )
+            db.add(c_notif)
+
+    # Audit logging
+    log_audit_event(
+        db=db,
+        actor_id=current_user.id,
+        actor_name=current_user.full_name,
+        actor_role=current_user.role,
+        event_type="CASE_ASSIGNMENT",
+        entity_type="Case",
+        entity_id=c.id,
+        previous_value=prev_name,
+        new_value=new_name,
+        remarks=assign_req.remarks or f"Case assigned to {new_name}"
+    )
+
+    # In-app notification for assigned officer
+    off_notif = Notification(
+        recipient_id=target_officer.id,
+        complainant_id=None,
+        notification_type="CASE_ASSIGNED",
+        related_case_id=c.id,
+        related_entity_type="Case",
+        related_entity_id=c.id,
+        title="New Case Allocated to You",
+        message=f"Case {c.id} ({c.category} - {c.institution.official_name}) has been assigned to you for investigation.",
+        severity="High",
+        is_read=False,
+        link_url=f"/cases/{c.id}"
+    )
+    db.add(off_notif)
+
+    db.commit()
+    db.refresh(c)
+    return serialize_case(c)
+
+@router.post("/{id}/link", response_model=CaseRelationshipResponse)
+def link_case(
+    id: str,
+    link_req: CaseLinkRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Consolidate or link two grievances/cases into a shared cluster or lead dossier.
+    Validates both cases exist, creates an active CaseRelationship record,
+    writes audit and case events on both matters, and returns the relationship.
+    """
+    case_a = db.query(Case).filter(Case.id == id).first()
+    if not case_a:
+        raise HTTPException(status_code=404, detail="Primary case not found")
+        
+    case_b = db.query(Case).filter(Case.id == link_req.target_case_id).first()
+    if not case_b:
+        raise HTTPException(status_code=404, detail="Target case to link not found")
+        
+    if case_a.id == case_b.id:
+        raise HTTPException(status_code=400, detail="Cannot link a case to itself")
+        
+    # Check if relationship already exists
+    existing = db.query(CaseRelationship).filter(
+        ((CaseRelationship.case_a_id == case_a.id) & (CaseRelationship.case_b_id == case_b.id)) |
+        ((CaseRelationship.case_a_id == case_b.id) & (CaseRelationship.case_b_id == case_a.id))
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Cases are already linked as '{existing.relationship_type}'")
+        
+    rel = CaseRelationship(
+        case_a_id=case_a.id,
+        case_b_id=case_b.id,
+        relationship_type=link_req.relationship_type,
+        status="Active",
+        reviewer_id=current_user.id,
+        review_remarks=link_req.remarks or f"Consolidated by {current_user.full_name}",
+        decided_at=datetime.utcnow(),
+        created_at=datetime.utcnow()
+    )
+    db.add(rel)
+    
+    # Record timeline event on case_a
+    record_case_event(
+        db=db,
+        case_id=case_a.id,
+        event_type="LINKED_CASE",
+        actor_id=current_user.id,
+        actor_name=current_user.full_name,
+        new_value=case_b.id,
+        remarks=f"Matter linked with case {case_b.id} ({link_req.relationship_type}). Remarks: {link_req.remarks or 'Consolidated for joint review'}",
+        is_public=False
+    )
+    
+    # Record timeline event on case_b
+    record_case_event(
+        db=db,
+        case_id=case_b.id,
+        event_type="LINKED_CASE",
+        actor_id=current_user.id,
+        actor_name=current_user.full_name,
+        new_value=case_a.id,
+        remarks=f"Matter linked from case {case_a.id} ({link_req.relationship_type}). Remarks: {link_req.remarks or 'Consolidated for joint review'}",
+        is_public=False
+    )
+    
+    # Audit log
+    log_audit_event(
+        db=db,
+        actor_id=current_user.id,
+        actor_name=current_user.full_name,
+        actor_role=current_user.role,
+        event_type="CASE_LINK",
+        entity_type="CaseRelationship",
+        entity_id=f"{case_a.id}<->{case_b.id}",
+        remarks=f"Linked as {link_req.relationship_type}. {link_req.remarks or ''}"
+    )
+    
+    db.commit()
+    db.refresh(rel)
+    
+    return {
+        "id": rel.id,
+        "case_a_id": rel.case_a_id,
+        "case_b_id": rel.case_b_id,
+        "related_case_id": case_b.id,
+        "relationship_type": rel.relationship_type,
+        "status": rel.status,
+        "similarity_score": rel.similarity_score,
+        "title": getattr(case_b, "title", None) or case_b.category,
+        "institution_name": case_b.institution.official_name if case_b.institution else "Unknown",
+        "case_status": case_b.status,
+        "remarks": rel.review_remarks,
+        "created_at": rel.created_at
+    }

@@ -15,6 +15,7 @@ def get_user_notifications(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Notification).filter(
+        Notification.complainant_id == None,
         (Notification.recipient_id == current_user.id) | (Notification.recipient_id == None)
     ).order_by(Notification.created_at.desc())
     
@@ -29,7 +30,11 @@ def mark_notification_as_read(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    notif = db.query(Notification).filter(Notification.id == id).first()
+    notif = db.query(Notification).filter(
+        Notification.id == id,
+        Notification.complainant_id == None,
+        (Notification.recipient_id == current_user.id) | (Notification.recipient_id == None)
+    ).first()
     if not notif:
         raise HTTPException(status_code=404, detail="Notification not found")
         
@@ -43,6 +48,7 @@ def mark_all_read(
     current_user: User = Depends(get_current_user)
 ):
     db.query(Notification).filter(
+        Notification.complainant_id == None,
         (Notification.recipient_id == current_user.id) | (Notification.recipient_id == None),
         Notification.is_read == False
     ).update({"is_read": True}, synchronize_session=False)

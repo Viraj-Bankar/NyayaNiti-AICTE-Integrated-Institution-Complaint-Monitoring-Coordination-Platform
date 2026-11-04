@@ -149,6 +149,7 @@ class Case(Base):
     complainant = relationship("Complainant", back_populates="cases")
     events = relationship("CaseEvent", back_populates="case", cascade="all, delete-orphan", order_by="CaseEvent.timestamp.desc()")
     documents = relationship("DocumentMetadata", back_populates="case", cascade="all, delete-orphan")
+    assignments = relationship("CaseAssignment", cascade="all, delete-orphan", order_by="CaseAssignment.assigned_at.desc()")
 
 class CaseEvent(Base):
     __tablename__ = "case_events"
@@ -171,13 +172,18 @@ class CaseAssignment(Base):
     __tablename__ = "case_assignments"
     
     id = Column(Integer, primary_key=True, index=True)
-    case_id = Column(String(100), ForeignKey("cases.id"), nullable=False)
+    case_id = Column(String(100), ForeignKey("cases.id"), nullable=False, index=True)
     from_officer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    to_officer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    to_officer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     assigned_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     bureau_id = Column(Integer, ForeignKey("bureaus.id"), nullable=False)
     remarks = Column(Text, nullable=True)
-    assigned_at = Column(DateTime, default=datetime.utcnow)
+    assigned_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    from_officer = relationship("User", foreign_keys=[from_officer_id])
+    to_officer = relationship("User", foreign_keys=[to_officer_id])
+    assigned_by = relationship("User", foreign_keys=[assigned_by_id])
+    bureau = relationship("Bureau", foreign_keys=[bureau_id])
 
 class CaseRelationship(Base):
     __tablename__ = "case_relationships"

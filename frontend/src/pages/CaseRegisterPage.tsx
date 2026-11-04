@@ -18,6 +18,10 @@ export const CaseRegisterPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters
+  const [activeTab, setActiveTab] = useState<'all' | 'intake' | 'citizen'>(
+    searchParams.get('unassigned_only') === 'true' ? 'intake' :
+    searchParams.get('citizen_only') === 'true' ? 'citizen' : 'all'
+  );
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || '');
@@ -43,7 +47,7 @@ export const CaseRegisterPage: React.FC = () => {
   useEffect(() => {
     loadCases();
     api.getInstitutions().then(setInstitutions).catch(console.error);
-  }, [statusFilter, priorityFilter, bureauFilter, overdueOnly, sortBy, order]);
+  }, [activeTab, statusFilter, priorityFilter, bureauFilter, overdueOnly, sortBy, order]);
 
   const loadCases = async () => {
     setIsLoading(true);
@@ -53,6 +57,8 @@ export const CaseRegisterPage: React.FC = () => {
         status: statusFilter,
         priority: priorityFilter,
         bureau_id: bureauFilter ? Number(bureauFilter) : undefined,
+        citizen_only: activeTab === 'citizen' || searchParams.get('citizen_only') === 'true',
+        unassigned_only: activeTab === 'intake' || searchParams.get('unassigned_only') === 'true',
         overdue_only: overdueOnly,
         sort_by: sortBy,
         order: order
@@ -71,6 +77,7 @@ export const CaseRegisterPage: React.FC = () => {
   };
 
   const handleResetFilters = () => {
+    setActiveTab('all');
     setSearchQuery('');
     setStatusFilter('');
     setPriorityFilter('');
@@ -151,6 +158,41 @@ export const CaseRegisterPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Intake & Directory Navigation Tabs */}
+        <div className="flex items-center gap-2 border-b border-slate-200">
+          <button
+            onClick={() => { setActiveTab('all'); setStatusFilter(''); }}
+            className={`px-4 py-2 text-xs font-bold transition-all rounded-t-lg border-t border-x cursor-pointer ${
+              activeTab === 'all'
+                ? 'bg-white text-[#092D62] border-slate-200 border-t-2 border-t-[#092D62] shadow-xs'
+                : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200/70'
+            }`}
+          >
+            All Complaints
+          </button>
+          <button
+            onClick={() => { setActiveTab('intake'); setStatusFilter('Submitted'); }}
+            className={`px-4 py-2 text-xs font-bold transition-all rounded-t-lg border-t border-x cursor-pointer flex items-center gap-2 ${
+              activeTab === 'intake'
+                ? 'bg-white text-amber-900 border-slate-200 border-t-2 border-t-amber-500 shadow-xs'
+                : 'bg-amber-50/70 text-amber-800 border-transparent hover:bg-amber-100/70'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <span>Intake Queue (Unassigned Grievances)</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('citizen'); setStatusFilter(''); }}
+            className={`px-4 py-2 text-xs font-bold transition-all rounded-t-lg border-t border-x cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'citizen'
+                ? 'bg-white text-[#1E5AA8] border-slate-200 border-t-2 border-t-[#1E5AA8] shadow-xs'
+                : 'bg-blue-50/60 text-blue-800 border-transparent hover:bg-blue-100/60'
+            }`}
+          >
+            <span>Citizen Grievances</span>
+          </button>
+        </div>
+
         {/* Filter Bar */}
         <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-3">
           <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-3">
@@ -158,7 +200,7 @@ export const CaseRegisterPage: React.FC = () => {
               <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by Case ID (AICTE-RB-2024-XXXX), Institution Name, Permanent ID, or Keywords..."
+                placeholder="Search by Case ID (AICTE-PGRC-2026-XXXX), Institution Name, Permanent ID, or Keywords..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 rounded border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-[#092D62] text-slate-800"
@@ -194,11 +236,22 @@ export const CaseRegisterPage: React.FC = () => {
                 className="px-2.5 py-1.5 rounded border border-slate-300 bg-white text-slate-700 text-xs focus:ring-1 focus:ring-[#092D62]"
               >
                 <option value="">All Statuses</option>
-                <option value="Pending">Pending</option>
-                <option value="Under Process">Under Process</option>
-                <option value="Disposed">Disposed</option>
-                <option value="Transferred">Transferred</option>
-                <option value="Escalated">Escalated</option>
+                <optgroup label="Modern Complaint Lifecycle">
+                  <option value="Submitted">Submitted (Intake)</option>
+                  <option value="Under Review">Under Review</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Additional Information Required">Additional Information Required</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Closed">Closed</option>
+                  <option value="Rejected">Rejected</option>
+                </optgroup>
+                <optgroup label="Legacy Administrative Statuses">
+                  <option value="Pending">Pending</option>
+                  <option value="Under Process">Under Process</option>
+                  <option value="Disposed">Disposed</option>
+                  <option value="Transferred">Transferred</option>
+                  <option value="Escalated">Escalated</option>
+                </optgroup>
               </select>
 
               {/* Priority Filter */}
@@ -289,9 +342,14 @@ export const CaseRegisterPage: React.FC = () => {
                           >
                             {c.id}
                           </span>
-                          <span className="text-[10px] text-slate-500 font-mono">
+                          <span className="text-[10px] text-slate-500 font-mono block">
                             {new Date(c.date_received).toLocaleDateString()}
                           </span>
+                          {(c.is_citizen_complaint || c.complainant_id) && (
+                            <span className="inline-block bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-bold px-1.5 py-0.2 rounded mt-0.5">
+                              Citizen Portal
+                            </span>
+                          )}
                         </td>
 
                         {/* Institution Name & ID */}
@@ -327,7 +385,13 @@ export const CaseRegisterPage: React.FC = () => {
 
                         {/* Assigned Officer */}
                         <td className="py-3 px-3 whitespace-nowrap text-slate-700 text-[11px]">
-                          {c.officer_name || 'Unassigned'}
+                          {c.officer_name && c.officer_name !== 'Unassigned' ? (
+                            <span className="font-medium text-slate-800">{c.officer_name}</span>
+                          ) : (
+                            <span className="text-amber-800 font-semibold bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] inline-block">
+                              Unassigned (Intake)
+                            </span>
+                          )}
                         </td>
 
                         {/* Priority */}

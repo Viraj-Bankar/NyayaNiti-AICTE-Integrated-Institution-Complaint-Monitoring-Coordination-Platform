@@ -65,13 +65,47 @@ export interface DocumentItem {
   id: number;
   case_id: string;
   file_name: string;
+  original_filename?: string;
   file_size: number;
   file_type: string;
   category: string;
   access_classification: string;
-  uploaded_by_id: number;
+  uploaded_by_id?: number;
   uploaded_by_name?: string;
+  uploaded_by_complainant_id?: number;
+  uploader_role?: string;
+  download_url?: string;
   upload_timestamp: string;
+}
+
+export interface CaseAssignmentItem {
+  id: number;
+  case_id: string;
+  from_officer_id?: number;
+  from_officer_name?: string;
+  to_officer_id: number;
+  to_officer_name: string;
+  assigned_by_id: number;
+  assigned_by_name: string;
+  bureau_id: number;
+  bureau_code?: string;
+  remarks?: string;
+  assigned_at: string;
+}
+
+export interface CaseRelationshipItem {
+  id: number;
+  case_a_id: string;
+  case_b_id: string;
+  related_case_id: string;
+  relationship_type: string;
+  status: string;
+  similarity_score?: number;
+  title?: string;
+  institution_name?: string;
+  case_status?: string;
+  remarks?: string;
+  created_at: string;
 }
 
 export interface CaseItem {
@@ -81,16 +115,17 @@ export interface CaseItem {
   permanent_id: string;
   complainant_type: string;
   complainant_masked: string;
+  title?: string;
   category: string;
   subcategory?: string;
   description: string;
   date_received: string;
-  status: 'Pending' | 'Under Process' | 'Disposed' | 'Transferred' | 'Escalated';
+  status: 'Pending' | 'Under Process' | 'Disposed' | 'Transferred' | 'Escalated' | 'Submitted' | 'Under Review' | 'In Progress' | 'Additional Information Required' | 'Resolved' | 'Closed' | 'Rejected' | string;
   current_bureau_id: number;
   bureau_code: string;
   assigned_officer_id?: number;
   officer_name?: string;
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low' | string;
   priority_score?: number;
   last_action?: string;
   next_action?: string;
@@ -100,10 +135,24 @@ export interface CaseItem {
   overlap_review_status: string;
   action_conflict_status: string;
   created_at: string;
+  complainant_id?: number;
+  is_citizen_complaint?: boolean;
   priority_factors?: any;
   priority_override_reason?: string;
   events?: CaseEvent[];
   documents?: DocumentItem[];
+  assignments?: CaseAssignmentItem[];
+  linked_cases?: CaseRelationshipItem[];
+  complainant_details?: {
+    id: number;
+    full_name: string;
+    email: string;
+    mobile: string;
+    complainant_type?: string;
+    is_email_verified?: boolean;
+    is_mobile_verified?: boolean;
+    created_at?: string;
+  };
 }
 
 export interface OverlapAlert {
@@ -187,6 +236,14 @@ export interface DashboardKpis {
   overdue: number;
   potential_overlaps_awaiting_review: number;
   action_conflicts_awaiting_review: number;
+  new_intake_complaints?: number;
+  submitted?: number;
+  under_review?: number;
+  in_progress?: number;
+  additional_info_required?: number;
+  resolved?: number;
+  closed?: number;
+  rejected?: number;
 }
 
 export interface AlertTickerItem {
@@ -358,4 +415,179 @@ export interface ComplainantNotificationItem {
   link_url?: string;
   created_at: string;
 }
+
+// ============================================================
+// Phase 5 Officer Complaint Intake Types
+// ============================================================
+export interface OfficerComplaintItem {
+  id: string;
+  title: string;
+  category: string;
+  subcategory?: string;
+  institution_id: number;
+  institution_name: string;
+  permanent_id: string;
+  district: string;
+  state: string;
+  status: string;
+  priority: string;
+  date_received: string;
+  prescribed_deadline: string;
+  assigned_officer_id?: number;
+  assigned_officer_name?: string;
+  complainant_masked?: string;
+  complainant_type?: string;
+  is_citizen_complaint: boolean;
+  documents_count: number;
+}
+
+export interface OfficerComplaintListResponse {
+  items: OfficerComplaintItem[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface OfficerComplaintMetadata {
+  bureaus: { id: number; code: string; name: string; description?: string }[];
+  categories: { id: number; name: string; code: string }[];
+  statutory_rejection_reasons: string[];
+  statuses: string[];
+}
+
+export interface OfficerComplaintDetail {
+  id: string;
+  title: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  status: string;
+  priority: string;
+  priority_score?: number;
+  date_received: string;
+  prescribed_deadline: string;
+  current_bureau: {
+    id?: number;
+    code: string;
+    name: string;
+  };
+  assigned_officer?: {
+    id?: number;
+    full_name?: string;
+    role?: string;
+  };
+  institution: {
+    id?: number;
+    official_name: string;
+    permanent_id: string;
+    district: string;
+    state: string;
+    region: string;
+  };
+  complainant?: {
+    id?: number;
+    full_name?: string;
+    email?: string;
+    mobile?: string;
+    complainant_type?: string;
+    is_email_verified?: boolean;
+    is_mobile_verified?: boolean;
+    created_at?: string;
+    masked_identifier?: string;
+    pii_redacted?: boolean;
+  };
+  documents: {
+    id: number;
+    case_id: string;
+    file_name: string;
+    original_filename: string;
+    file_size: number;
+    file_type: string;
+    category: string;
+    access_classification: string;
+    uploader_role?: string;
+    download_url: string;
+    upload_timestamp: string;
+  }[];
+  public_history: {
+    id: number;
+    event_type: string;
+    actor_name: string;
+    new_value?: string;
+    remarks?: string;
+    timestamp: string;
+  }[];
+  internal_notes: {
+    id: number;
+    event_type: string;
+    actor_id?: number;
+    actor_name: string;
+    remarks?: string;
+    timestamp: string;
+  }[];
+  linked_cases: {
+    id: number;
+    related_case_id: string;
+    relationship_type: string;
+    status: string;
+    similarity_score?: number;
+    title: string;
+    institution_name: string;
+    case_status: string;
+    remarks?: string;
+    created_at: string;
+  }[];
+  assignments: {
+    id: number;
+    from_officer_name?: string;
+    to_officer_id: number;
+    to_officer_name: string;
+    assigned_by_name: string;
+    bureau_code: string;
+    remarks?: string;
+    assigned_at: string;
+  }[];
+}
+
+export interface OfficerComplaintAcceptPayload {
+  remarks?: string;
+  priority?: string;
+  target_bureau_id?: number;
+}
+
+export interface OfficerComplaintRejectPayload {
+  statutory_reason: string;
+  remarks: string;
+}
+
+export interface OfficerComplaintRequestInfoPayload {
+  query_details: string;
+  required_documents?: string;
+  deadline_days?: number;
+}
+
+export interface OfficerComplaintAssignPayload {
+  to_officer_id: number;
+  bureau_id?: number;
+  remarks?: string;
+}
+
+export interface OfficerComplaintLinkPayload {
+  target_case_id: string;
+  relationship_type: string;
+  remarks?: string;
+}
+
+export interface OfficerComplaintResolvePayload {
+  resolution_findings: string;
+  action_taken?: string;
+  remarks?: string;
+}
+
+export interface OfficerComplaintClosePayload {
+  closure_remarks?: string;
+}
+
+
 

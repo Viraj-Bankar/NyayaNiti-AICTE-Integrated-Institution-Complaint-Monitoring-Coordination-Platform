@@ -25,9 +25,25 @@ def get_dashboard_kpis(
     disposed = db.query(func.count(Case.id)).filter(Case.status == "Disposed").scalar() or 0
     transferred = db.query(func.count(Case.id)).filter(Case.status == "Transferred").scalar() or 0
     
+    # Phase 4/5 specific complaint statuses
+    submitted = db.query(func.count(Case.id)).filter(Case.status == "Submitted").scalar() or 0
+    under_review = db.query(func.count(Case.id)).filter(Case.status == "Under Review").scalar() or 0
+    in_progress = db.query(func.count(Case.id)).filter(Case.status == "In Progress").scalar() or 0
+    additional_info = db.query(func.count(Case.id)).filter(Case.status == "Additional Information Required").scalar() or 0
+    resolved = db.query(func.count(Case.id)).filter(Case.status == "Resolved").scalar() or 0
+    closed = db.query(func.count(Case.id)).filter(Case.status == "Closed").scalar() or 0
+    rejected = db.query(func.count(Case.id)).filter(Case.status == "Rejected").scalar() or 0
+    
+    # New intake complaints: Submitted and unassigned
+    new_intake = db.query(func.count(Case.id)).filter(
+        Case.status == "Submitted",
+        Case.assigned_officer_id == None
+    ).scalar() or 0
+
+    # Overdue SLA query across all active status categories
     overdue = db.query(func.count(Case.id)).filter(
         Case.prescribed_deadline < now,
-        Case.status.in_(["Pending", "Under Process", "Escalated"])
+        Case.status.in_(["Pending", "Under Process", "Escalated", "Submitted", "Under Review", "In Progress", "Additional Information Required"])
     ).scalar() or 0
     
     overlaps_awaiting = db.query(func.count(OverlapAlert.id)).filter(
@@ -38,15 +54,28 @@ def get_dashboard_kpis(
         ActionConflictAlert.status.in_(["Pending Review", "Clarification Requested"])
     ).scalar() or 0
     
+    # Harmonized combined totals for legacy dashboard cards
+    combined_pending = pending + submitted
+    combined_under_process = under_process + under_review + in_progress + additional_info
+    combined_disposed = disposed + resolved + closed
+    
     return {
         "total_complaints": total,
-        "pending": pending,
-        "under_process": under_process,
-        "disposed": disposed,
+        "pending": combined_pending,
+        "under_process": combined_under_process,
+        "disposed": combined_disposed,
         "transferred": transferred,
         "overdue": overdue,
         "potential_overlaps_awaiting_review": overlaps_awaiting,
-        "action_conflicts_awaiting_review": conflicts_awaiting
+        "action_conflicts_awaiting_review": conflicts_awaiting,
+        "new_intake_complaints": new_intake,
+        "submitted": submitted,
+        "under_review": under_review,
+        "in_progress": in_progress,
+        "additional_info_required": additional_info,
+        "resolved": resolved,
+        "closed": closed,
+        "rejected": rejected
     }
 
 @router.get("/ticker", response_model=List[AlertTickerItem])
@@ -156,30 +185,35 @@ def get_dashboard_charts(
     # 1. Bureau-wise case workload
     bureaus = db.query(Bureau).all()
     bureau_workload = []
+    active_status_list = ["Pending", "Under Process", "Escalated", "Submitted", "Under Review", "In Progress", "Additional Information Required"]
     for b in bureaus:
         total = db.query(func.count(Case.id)).filter(Case.current_bureau_id == b.id).scalar() or 0
-        pending = db.query(func.count(Case.id)).filter(
+        active_count = db.query(func.count(Case.id)).filter(
             Case.current_bureau_id == b.id,
-            Case.status.in_(["Pending", "Under Process", "Escalated"])
+            Case.status.in_(active_status_list)
         ).scalar() or 0
         disposed = db.query(func.count(Case.id)).filter(
             Case.current_bureau_id == b.id,
-            Case.status == "Disposed"
+            Case.status.in_(["Disposed", "Resolved", "Closed"])
         ).scalar() or 0
         bureau_workload.append({
             "bureau": b.code,
             "name": b.name,
             "total": total,
-            "active": pending,
+            "active": active_count,
             "disposed": disposed
         })
         
     # 2. Complaint status distribution
-    statuses = ["Pending", "Under Process", "Disposed", "Transferred", "Escalated"]
+    statuses = [
+        "Submitted", "Under Review", "In Progress", "Additional Information Required",
+        "Pending", "Under Process", "Resolved", "Disposed", "Transferred", "Escalated", "Closed", "Rejected"
+    ]
     status_distribution = []
     for s in statuses:
         count = db.query(func.count(Case.id)).filter(Case.status == s).scalar() or 0
-        status_distribution.append({"status": s, "count": count})
+        if count > 0 or s in ["Submitted", "Under Review", "In Progress", "Pending", "Under Process", "Resolved", "Disposed"]:
+            status_distribution.append({"status": s, "count": count})
         
     # 3. Priority distribution
     priorities = ["Critical", "High", "Medium", "Low"]
@@ -198,7 +232,7 @@ def get_dashboard_charts(
     
     # 5. Case Ageing distribution (< 15 days, 15-30 days, 31-60 days, > 60 days)
     age_groups = {"< 15 Days": 0, "15 - 30 Days": 0, "31 - 60 Days": 0, "> 60 Days": 0}
-    active_cases = db.query(Case).filter(Case.status.in_(["Pending", "Under Process", "Escalated"])).all()
+    active_cases = db.query(Case).filter(Case.status.in_(active_status_list)).all()
     for c in active_cases:
         age_days = (now - c.date_received).days
         if age_days < 15:

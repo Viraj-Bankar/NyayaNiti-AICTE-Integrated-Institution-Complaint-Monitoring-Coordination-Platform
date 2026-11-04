@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  Home, LayoutDashboard, FileText, GitCompare, AlertTriangle,
+  Home, LayoutDashboard, Inbox, FileText, GitCompare, AlertTriangle,
   Layers, Building2, CheckCircle2, TrendingUp, BarChart3,
   ShieldCheck, Settings, Menu, X
 } from 'lucide-react';
@@ -25,6 +25,7 @@ export const GovNavBar: React.FC = () => {
   const operationalNavItems = [
     { label: 'Home', path: '/', icon: Home },
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Complaint Intake', path: '/complaint-intake', icon: Inbox, badge: 'Intake' },
     { label: 'Case Register', path: '/cases', icon: FileText },
     { label: 'Overlap Center', path: '/overlaps', icon: GitCompare, badge: 'AI' },
     { label: 'Action Conflicts', path: '/action-conflicts', icon: AlertTriangle },

@@ -197,16 +197,19 @@ export const DashboardPage: React.FC = () => {
             <span className="text-[9px] text-slate-500 block mt-1">Registry-Wide</span>
           </div>
 
-          {/* Card 2: Pending */}
+          {/* Card 2: Intake Queue */}
           <div
-            onClick={() => navigate('/cases?status=Pending')}
-            className="bg-white rounded-lg p-3 border border-amber-200 shadow-sm hover:shadow-md hover:border-amber-400 transition-all cursor-pointer group"
+            onClick={() => navigate('/cases?status=Submitted&unassigned_only=true')}
+            className="bg-amber-50/60 rounded-lg p-3 border border-amber-300 shadow-sm hover:shadow-md hover:border-amber-500 transition-all cursor-pointer group"
           >
-            <span className="text-[10px] uppercase font-bold text-amber-800">Pending</span>
-            <div className="text-xl font-black text-[#FFB900] mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
-              {renderKpiValue(kpis?.pending)}
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-amber-900">Intake Queue</span>
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
             </div>
-            <span className="text-[9px] text-amber-700 block mt-1">Initial Scrutiny</span>
+            <div className="text-xl font-black text-amber-900 mt-1 group-hover:scale-105 transition-transform min-h-[1.75rem] flex items-center">
+              {renderKpiValue(kpis?.new_intake_complaints ?? kpis?.submitted ?? kpis?.pending)}
+            </div>
+            <span className="text-[9px] text-amber-800 block mt-1 font-semibold">Unassigned Grievances</span>
           </div>
 
           {/* Card 3: Under Process */}

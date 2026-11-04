@@ -584,6 +584,22 @@ def _file_complaint(
             link_url=f"/complainant/cases/{new_case.id}"
         )
         db.add(notif)
+        
+        # 11. Internal officer intake alert for PGRC bureau
+        officer_notif = Notification(
+            recipient_id=None,
+            complainant_id=None,
+            notification_type="NEW_GRIEVANCE_SUBMITTED",
+            related_case_id=new_case.id,
+            related_entity_type="Case",
+            related_entity_id=new_case.id,
+            title="New Grievance Awaiting Intake Scrutiny",
+            message=f"Grievance {new_case.id} submitted for {inst.official_name} under '{new_case.category}'. Awaiting officer allocation.",
+            severity="Medium",
+            is_read=False,
+            link_url=f"/cases/{new_case.id}"
+        )
+        db.add(officer_notif)
         db.commit()
     except Exception as e:
         print(f"Notification creation note: {e}")

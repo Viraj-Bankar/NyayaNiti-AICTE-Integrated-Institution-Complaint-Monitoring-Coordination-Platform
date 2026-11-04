@@ -168,11 +168,57 @@ class CaseResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class CaseAssignmentRequest(BaseModel):
+    to_officer_id: int
+    remarks: Optional[str] = None
+
+class CaseAssignmentResponse(BaseModel):
+    id: int
+    case_id: str
+    from_officer_id: Optional[int] = None
+    from_officer_name: Optional[str] = None
+    to_officer_id: int
+    to_officer_name: Optional[str] = None
+    assigned_by_id: int
+    assigned_by_name: Optional[str] = None
+    bureau_id: int
+    bureau_code: Optional[str] = None
+    remarks: Optional[str] = None
+    assigned_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CaseRelationshipResponse(BaseModel):
+    id: int
+    case_a_id: str
+    case_b_id: str
+    related_case_id: str
+    relationship_type: str
+    status: str
+    similarity_score: Optional[float] = None
+    title: Optional[str] = None
+    institution_name: Optional[str] = None
+    case_status: Optional[str] = None
+    remarks: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CaseLinkRequest(BaseModel):
+    target_case_id: str
+    relationship_type: str = "Consolidated Grievance"  # 'Consolidated Grievance', 'Related Matter', 'Shared Institution'
+    remarks: Optional[str] = None
+
 class CaseDetailResponse(CaseResponse):
     priority_factors: Optional[Dict[str, Any]] = None
     priority_override_reason: Optional[str] = None
     events: List[CaseEventResponse] = []
     documents: List[Any] = []
+    assignments: List[CaseAssignmentResponse] = []
+    complainant_details: Optional[Dict[str, Any]] = None
+    linked_cases: List[CaseRelationshipResponse] = []
 
     class Config:
         from_attributes = True
@@ -305,12 +351,16 @@ class DocumentMetadataResponse(BaseModel):
     id: int
     case_id: str
     file_name: str
+    original_filename: Optional[str] = None
     file_size: int
     file_type: str
     category: str
     access_classification: str
-    uploaded_by_id: int
+    uploaded_by_id: Optional[int] = None
     uploaded_by_name: Optional[str] = None
+    uploaded_by_complainant_id: Optional[int] = None
+    uploader_role: Optional[str] = "officer"
+    download_url: Optional[str] = None
     upload_timestamp: datetime
 
     class Config:
@@ -344,6 +394,15 @@ class DashboardKpis(BaseModel):
     overdue: int
     potential_overlaps_awaiting_review: int
     action_conflicts_awaiting_review: int
+    # Phase 5 Modern Intake & Status Metrics
+    new_intake_complaints: Optional[int] = 0
+    submitted: Optional[int] = 0
+    under_review: Optional[int] = 0
+    in_progress: Optional[int] = 0
+    additional_info_required: Optional[int] = 0
+    resolved: Optional[int] = 0
+    closed: Optional[int] = 0
+    rejected: Optional[int] = 0
 
 class AlertTickerItem(BaseModel):
     id: str
@@ -517,5 +576,69 @@ class ComplainantClarificationRequest(BaseModel):
 class CaseInternalNoteRequest(BaseModel):
     remarks: str = Field(..., min_length=3, max_length=2000, description="Internal officer deliberation or inspection observation")
     is_public: bool = Field(False, description="Whether this note is visible to citizen timeline (default: False)")
+
+# Officer Complaint Intake & Case Integration Schemas
+class OfficerComplaintItem(BaseModel):
+    id: str
+    title: Optional[str] = None
+    category: str
+    subcategory: Optional[str] = None
+    institution_id: int
+    institution_name: str
+    permanent_id: str
+    district: str
+    state: str
+    status: str
+    priority: str
+    date_received: datetime
+    prescribed_deadline: datetime
+    assigned_officer_id: Optional[int] = None
+    assigned_officer_name: Optional[str] = None
+    complainant_masked: Optional[str] = None
+    complainant_type: str
+    is_citizen_complaint: bool = True
+    documents_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+class OfficerComplaintListResponse(BaseModel):
+    items: List[OfficerComplaintItem]
+    total: int
+    page: int
+    limit: int
+    pages: int
+
+class OfficerComplaintRejectRequest(BaseModel):
+    statutory_reason: str = Field(..., description="Statutory non-admissibility basis")
+    remarks: str = Field(..., min_length=5, description="Detailed regulatory grounds for non-admissibility")
+
+class OfficerComplaintRequestInfo(BaseModel):
+    query_details: str = Field(..., min_length=5, description="Clarification or evidence requested from complainant")
+    required_documents: Optional[str] = None
+    deadline_days: int = Field(14, ge=1, le=60, description="Response window in days")
+
+class OfficerComplaintAcceptRequest(BaseModel):
+    priority: Optional[str] = None
+    target_bureau_id: Optional[int] = None
+    remarks: Optional[str] = None
+
+class OfficerComplaintAssignRequest(BaseModel):
+    to_officer_id: int
+    bureau_id: Optional[int] = None
+    remarks: Optional[str] = None
+
+class OfficerComplaintLinkRequest(BaseModel):
+    target_case_id: str
+    relationship_type: str = "Consolidated Grievance"
+    remarks: Optional[str] = None
+
+class OfficerComplaintResolveRequest(BaseModel):
+    resolution_findings: str = Field(..., min_length=5, description="Findings and regulatory compliance orders")
+    action_taken: Optional[str] = None
+    remarks: Optional[str] = None
+
+class OfficerComplaintCloseRequest(BaseModel):
+    closure_remarks: Optional[str] = Field(None, description="Official closure summary")
 
 

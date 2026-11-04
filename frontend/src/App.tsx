@@ -32,6 +32,8 @@ import { ComplainantDashboardPage } from './pages/ComplainantDashboardPage';
 import { ComplaintSubmissionPage } from './pages/ComplaintSubmissionPage';
 import { ComplaintHistoryPage } from './pages/ComplaintHistoryPage';
 import { ComplaintDetailPage } from './pages/ComplaintDetailPage';
+import { OfficerComplaintInboxPage } from './pages/OfficerComplaintInboxPage';
+import { OfficerComplaintReviewPage } from './pages/OfficerComplaintReviewPage';
 
 /**
  * RootRoute:
@@ -140,6 +142,39 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Officer Complaint Intake & Scrutiny Routes (Phase 5) */}
+              <Route
+                path="/complaint-intake"
+                element={
+                  <ProtectedRoute>
+                    <OfficerComplaintInboxPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/officer/complaints"
+                element={
+                  <ProtectedRoute>
+                    <OfficerComplaintInboxPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/complaint-intake/:id"
+                element={
+                  <ProtectedRoute>
+                    <OfficerComplaintReviewPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/officer/complaints/:id"
+                element={
+                  <ProtectedRoute>
+                    <OfficerComplaintReviewPage />
                   </ProtectedRoute>
                 }
               />

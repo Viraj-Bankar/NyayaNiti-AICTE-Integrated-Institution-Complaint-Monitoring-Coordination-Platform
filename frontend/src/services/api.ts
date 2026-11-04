@@ -4,7 +4,11 @@ import {
   AuditLogItem, DocumentItem, Complainant, ComplainantRegisterData,
   ComplainantCaseItem, ComplainantCaseDetail, ComplainantInstitutionItem,
   ComplainantCategoryItem, ComplainantDocumentItem, ComplainantReceipt,
-  ComplainantNotificationItem
+  ComplainantNotificationItem,
+  OfficerComplaintListResponse, OfficerComplaintMetadata,
+  OfficerComplaintDetail, OfficerComplaintAcceptPayload, OfficerComplaintRejectPayload,
+  OfficerComplaintRequestInfoPayload, OfficerComplaintAssignPayload, OfficerComplaintLinkPayload,
+  OfficerComplaintResolvePayload, OfficerComplaintClosePayload
 } from '../types';
 
 /**
@@ -192,6 +196,8 @@ export const api = {
     priority?: string;
     bureau_id?: number;
     institution_id?: number;
+    citizen_only?: boolean;
+    unassigned_only?: boolean;
     overdue_only?: boolean;
     sort_by?: string;
     order?: string;
@@ -208,6 +214,67 @@ export const api = {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
+  },
+
+  async getAvailableOfficers(bureau_id?: number): Promise<User[]> {
+    const url = buildApiUrl('/cases/officers/available', { bureau_id });
+    const res = await fetch(url, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async assignCase(id: string, to_officer_id: number, remarks?: string): Promise<CaseItem> {
+    const res = await fetch(`${API_BASE}/cases/${id}/assign`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ to_officer_id, remarks })
+    });
+    return handleResponse(res);
+  },
+
+  async linkCase(id: string, target_case_id: string, relationship_type: string = 'Consolidated Grievance', remarks?: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/cases/${id}/link`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ target_case_id, relationship_type, remarks })
+    });
+    return handleResponse(res);
+  },
+
+  async addCaseNote(id: string, remarks: string, is_public: boolean = false): Promise<any> {
+    const res = await fetch(`${API_BASE}/cases/${id}/notes`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ remarks, is_public })
+    });
+    return handleResponse(res);
+  },
+
+  async downloadCaseDocument(documentId: number, filename?: string): Promise<void> {
+    const token = localStorage.getItem('nyayaniti_token');
+    const res = await fetch(`${API_BASE}/documents/${documentId}/download`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      let errText = `Failed to download document: HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        errText = errJson.detail || errText;
+      } catch {
+        // fallback
+      }
+      throw new Error(errText);
+    }
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename || `document_${documentId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   },
 
   async createCase(payload: any): Promise<CaseItem> {
@@ -676,5 +743,143 @@ export const api = {
       body: JSON.stringify(payload)
     });
     return handleResponse(res);
+  },
+
+  // ============================================================
+  // Phase 5 Officer Complaint Intake APIs
+  // ============================================================
+  async getOfficerComplaints(params: {
+    q?: string;
+    status?: string;
+    category?: string;
+    institution_id?: number;
+    unassigned_only?: boolean;
+    citizen_only?: boolean;
+    date_from?: string;
+    date_to?: string;
+    sort_by?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<OfficerComplaintListResponse> {
+    const url = buildApiUrl('/officer/complaints', params);
+    const res = await fetch(url, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getOfficerComplaintMetadata(): Promise<OfficerComplaintMetadata> {
+    const res = await fetch(`${API_BASE}/officer/complaints/metadata`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getOfficerComplaintDetail(id: string): Promise<OfficerComplaintDetail> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async startComplaintReview(id: string): Promise<{ message: string; id: string; status: string }> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/start-review`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async acceptComplaint(id: string, payload: OfficerComplaintAcceptPayload): Promise<{ message: string; id: string; status: string }> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/accept`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async rejectComplaint(id: string, payload: OfficerComplaintRejectPayload): Promise<{ message: string; id: string; status: string }> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/reject`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async requestComplaintInfo(id: string, payload: OfficerComplaintRequestInfoPayload): Promise<{ message: string; id: string; status: string }> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/request-info`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async assignComplaintOfficer(
+    id: string,
+    payload: OfficerComplaintAssignPayload
+  ): Promise<{ message: string; id: string; assigned_officer_id: number; assigned_officer_name: string; status: string }> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/assign`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async linkComplaintCase(id: string, payload: OfficerComplaintLinkPayload): Promise<any> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/link-case`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async resolveOfficerComplaint(id: string, payload: OfficerComplaintResolvePayload): Promise<{ message: string; id: string; status: string }> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/resolve`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async closeOfficerComplaint(id: string, payload?: OfficerComplaintClosePayload): Promise<{ message: string; id: string; status: string }> {
+    const res = await fetch(`${API_BASE}/officer/complaints/${id}/close`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload || {})
+    });
+    return handleResponse(res);
+  },
+
+  async downloadOfficerComplaintDocument(complaintId: string, documentId: number, filename?: string): Promise<void> {
+    const token = localStorage.getItem('nyayaniti_token');
+    const res = await fetch(`${API_BASE}/officer/complaints/${complaintId}/documents/${documentId}/download`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      let errText = `Failed to download evidence document: HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        errText = errJson.detail || errText;
+      } catch {
+        // fallback
+      }
+      throw new Error(errText);
+    }
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename || `complaint_${complaintId}_evidence_${documentId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   }
 };
