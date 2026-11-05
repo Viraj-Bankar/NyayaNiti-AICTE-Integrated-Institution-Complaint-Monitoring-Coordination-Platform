@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AICTEComplaintPair",
+  "description": "Standardized schema for labelled complaint pairs in NyayaNiti duplicate detection pipeline",
+  "type": "object",
+  "required": [
+    "complaint_id_1",
+    "complaint_id_2",
+    "complaint_text_1",
+    "complaint_text_2",
+    "label"
+  ],
+  "properties": {
+    "pair_id": {
+      "type": "string",
+      "description": "Deterministic unique pair identifier (e.g., PAIR-0001)"
+    },
+    "complaint_id_1": {
+      "type": "string",
+      "description": "First complaint statutory reference number"
+    },
+    "complaint_id_2": {
+      "type": "string",
+      "description": "Second complaint statutory reference number"
+    },
+    "complaint_text_1": {
+      "type": "string",
+      "description": "Normalized text content (title + description) of the first complaint"
+    },
+    "complaint_text_2": {
+      "type": "string",
+      "description": "Normalized text content (title + description) of the second complaint"
+    },
+    "label": {
+      "type": "integer",
+      "enum": [0, 1],
+      "description": "Binary duplicate classification label: 1 = Duplicate, 0 = Non-duplicate"
+    },
+    "multiclass_label": {
+      "type": "integer",
+      "enum": [0, 1, 2],
+      "description": "Taxonomy label: 0 = Distinct, 1 = True Duplicate Matter, 2 = Related Matter / Common Institution Overlap"
+    },
+    "institution_id_1": {
+      "type": "integer",
+      "description": "Institution ID of complaint 1"
+    },
+    "institution_id_2": {
+      "type": "integer",
+      "description": "Institution ID of complaint 2"
+    },
+    "category_1": {
+      "type": "string",
+      "description": "Grievance category of complaint 1"
+    },
+    "category_2": {
+      "type": "string",
+      "description": "Grievance category of complaint 2"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": ["VERIFIED", "PENDING_VERIFICATION", "REJECTED_INVALID"],
+      "description": "Annotation verification lifecycle state"
+    },
+    "verification_source": {
+      "type": "string",
+      "description": "Ground truth verification origin (e.g., SEED_CANONICAL_DUPLICATE, STATUTORY_INSPECTION_RECORD, HUMAN_EXPERT_ANNOTATION)"
+    },
+    "annotator_id": {
+      "type": "string",
+      "description": "Identifier of the legal/scrutiny officer who verified or annotated the pair"
+    },
+    "verification_notes": {
+      "type": "string",
+      "description": "Statutory reasoning or rationale for the assigned duplicate/non-duplicate label"
+    }
+  },
+  "additionalProperties": false
+}
+

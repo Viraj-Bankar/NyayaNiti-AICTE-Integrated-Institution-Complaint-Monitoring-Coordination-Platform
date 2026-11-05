@@ -219,6 +219,7 @@ class CaseDetailResponse(CaseResponse):
     assignments: List[CaseAssignmentResponse] = []
     complainant_details: Optional[Dict[str, Any]] = None
     linked_cases: List[CaseRelationshipResponse] = []
+    coordination_workspaces: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         from_attributes = True
@@ -270,6 +271,7 @@ class ActionConflictAlertResponse(BaseModel):
     reviewer_id: Optional[int] = None
     resolution_notes: Optional[str] = None
     reconciled_action: Optional[str] = None
+    coordination_workspace_id: Optional[int] = None
     created_at: datetime
     case_a: Optional[CaseResponse] = None
     case_b: Optional[CaseResponse] = None
@@ -278,11 +280,33 @@ class ActionConflictAlertResponse(BaseModel):
         from_attributes = True
 
 class ActionConflictReviewRequest(BaseModel):
-    decision: str  # 'CONFIRM_CONFLICT', 'REJECT_CONFLICT', 'REQUEST_CLARIFICATION', 'REFER_TO_BUREAU_HEAD', 'RESOLVE'
+    decision: str  # 'CONFIRM_CONFLICT', 'REJECT_CONFLICT', 'REQUEST_CLARIFICATION', 'REFER_TO_BUREAU_HEAD', 'RESOLVE', 'COORDINATE'
     resolution_notes: str
     reconciled_action: Optional[str] = None
+    coordination_title: Optional[str] = None
 
 # Coordination Workspace
+class CoordinationParticipantCreate(BaseModel):
+    officer_id: int
+    bureau_id: int
+    role: Optional[str] = "Participant Officer"
+
+class CoordinationParticipantResponse(BaseModel):
+    id: int
+    workspace_id: int
+    officer_id: int
+    officer_name: Optional[str] = None
+    bureau_id: int
+    bureau_code: Optional[str] = None
+    role: str
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CaseCoordinationLinkCreate(BaseModel):
+    case_id: str
+
 class CoordinationTaskCreate(BaseModel):
     title: str
     description: Optional[str] = None
@@ -290,6 +314,16 @@ class CoordinationTaskCreate(BaseModel):
     bureau_id: int
     due_date: datetime
     priority: Optional[str] = "Medium"
+    depends_on_task_id: Optional[int] = None
+    evidence_doc_id: Optional[int] = None
+
+class CoordinationTaskUpdate(BaseModel):
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[datetime] = None
+    remarks: Optional[str] = None
+    depends_on_task_id: Optional[int] = None
+    evidence_doc_id: Optional[int] = None
 
 class CoordinationTaskResponse(BaseModel):
     id: int
@@ -304,9 +338,39 @@ class CoordinationTaskResponse(BaseModel):
     priority: str
     status: str
     remarks: Optional[str] = None
+    depends_on_task_id: Optional[int] = None
+    evidence_doc_id: Optional[int] = None
 
     class Config:
         from_attributes = True
+
+class MeetingRecordCreate(BaseModel):
+    meeting_date: Optional[datetime] = None
+    chair_name: Optional[str] = None
+    attendee_ids: Optional[List[int]] = []
+    discussion_summary: str
+    action_items: Optional[List[str]] = []
+
+class WorkspaceResolveRequest(BaseModel):
+    resolution_status: str = "Completed"  # 'Completed' or 'Closed with Justification'
+    consensus_decisions: str
+    apply_to_cases: Optional[bool] = True
+
+class CoordinationWorkspaceCreate(BaseModel):
+    title: str
+    institution_id: int
+    primary_bureau_id: int
+    secondary_bureau_id: Optional[int] = None
+    justification: Optional[str] = None
+    linked_case_ids: Optional[List[str]] = []
+    participant_ids: Optional[List[int]] = []
+
+class CoordinationWorkspaceUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None
+    justification: Optional[str] = None
+    decisions: Optional[str] = None
+    secondary_bureau_id: Optional[int] = None
 
 class CoordinationWorkspaceResponse(BaseModel):
     id: int
@@ -322,7 +386,9 @@ class CoordinationWorkspaceResponse(BaseModel):
     status: str
     justification: Optional[str] = None
     decisions: Optional[str] = None
+    meeting_records: Optional[List[Dict[str, Any]]] = None
     linked_case_ids: List[str] = []
+    participants: List[CoordinationParticipantResponse] = []
     tasks: List[CoordinationTaskResponse] = []
     created_at: datetime
 
@@ -394,7 +460,9 @@ class DashboardKpis(BaseModel):
     overdue: int
     potential_overlaps_awaiting_review: int
     action_conflicts_awaiting_review: int
-    # Phase 5 Modern Intake & Status Metrics
+    # Phase 7 Coordination Metrics
+    active_coordination_workspaces: Optional[int] = 0
+    coordination_tasks_pending: Optional[int] = 0
     new_intake_complaints: Optional[int] = 0
     submitted: Optional[int] = 0
     under_review: Optional[int] = 0
@@ -640,5 +708,94 @@ class OfficerComplaintResolveRequest(BaseModel):
 
 class OfficerComplaintCloseRequest(BaseModel):
     closure_remarks: Optional[str] = Field(None, description="Official closure summary")
+
+# -------------------------------------------------------------------------
+# Phase 6: AI-Powered Semantic Duplicate Complaint Detection Schemas
+# -------------------------------------------------------------------------
+
+class AIDuplicateCandidateResponse(BaseModel):
+    recommendation_id: Optional[int] = None
+    source_complaint_id: str
+    candidate_complaint_id: str
+    candidate_title: Optional[str] = None
+    candidate_category: str
+    candidate_institution_id: int
+    candidate_institution_name: str
+    candidate_status: str
+    candidate_date_received: datetime
+    predicted_relationship: str  # 'HIGH_CONFIDENCE_DUPLICATE', 'MANUAL_REVIEW_REQUIRED', 'DISTINCT_MATTERS'
+    similarity_score: float  # Cosine similarity metric (strictly distinguished from probability)
+    duplicate_probability: float  # Calibrated SVM probability P(duplicate|features)
+    svm_decision: bool
+    institution_match: bool
+    category_match: bool
+    matching_features: Dict[str, Any]
+    explanation: str
+    statutory_advice: str
+    verification_status: str  # 'PENDING_REVIEW', 'CONFIRMED_DUPLICATE', 'MARKED_RELATED', 'REJECTED'
+    verification_reason: Optional[str] = None
+    model_version: str
+
+    class Config:
+        from_attributes = True
+
+class AIDuplicateAnalysisResponse(BaseModel):
+    source_complaint_id: str
+    source_title: Optional[str] = None
+    source_institution_id: int
+    source_institution_name: str
+    total_candidates_evaluated: int
+    high_confidence_count: int
+    review_required_count: int
+    candidates: List[AIDuplicateCandidateResponse]
+    model_name: str
+    model_version: str
+    vector_search_engine: str
+    analyzed_at: datetime
+
+class AIDuplicateDetailResponse(BaseModel):
+    complaint_id: str
+    complaint_title: Optional[str] = None
+    institution_id: int
+    institution_name: str
+    total_candidates_analyzed: int
+    high_confidence_duplicates_count: int
+    review_required_count: int
+    top_recommendation: Optional[AIDuplicateCandidateResponse] = None
+    has_active_recommendations: bool
+    model_version: str
+    last_analyzed_at: Optional[datetime] = None
+
+class OfficerDuplicateVerifyRequest(BaseModel):
+    candidate_id: str = Field(..., description="Target candidate complaint reference ID")
+    decision: str = Field(..., description="Verification decision: CONFIRM_DUPLICATE, MARK_RELATED, or REJECT_RECOMMENDATION")
+    reason: str = Field(..., min_length=5, description="Mandatory official justification for review decision")
+    link_dossier: bool = Field(True, description="Whether to create formal linked CaseRelationship on duplicate confirmation")
+
+class OfficerDuplicateVerifyResponse(BaseModel):
+    status: str
+    message: str
+    source_complaint_id: str
+    candidate_complaint_id: str
+    decision: str
+    linked_relationship_id: Optional[int] = None
+    verified_at: datetime
+    verified_by: str
+
+class AIModelStatusResponse(BaseModel):
+    model_name: str
+    model_version: str
+    is_available: bool
+    embedding_dim: int
+    device: str
+    feature_count: int
+    feature_names: List[str]
+    best_hyperparameters: Dict[str, Any]
+    decision_thresholds: Dict[str, float]
+    vector_engine: str
+    pgvector_status: str
+    pgvector_note: str
+    statutory_safeguard: str
+
 
 

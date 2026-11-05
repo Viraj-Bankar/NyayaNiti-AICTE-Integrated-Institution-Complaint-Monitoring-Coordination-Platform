@@ -8,7 +8,9 @@ import {
   OfficerComplaintListResponse, OfficerComplaintMetadata,
   OfficerComplaintDetail, OfficerComplaintAcceptPayload, OfficerComplaintRejectPayload,
   OfficerComplaintRequestInfoPayload, OfficerComplaintAssignPayload, OfficerComplaintLinkPayload,
-  OfficerComplaintResolvePayload, OfficerComplaintClosePayload
+  OfficerComplaintResolvePayload, OfficerComplaintClosePayload,
+  AIDuplicateCandidate, AIDuplicateAnalysis, AIDuplicateDetail,
+  OfficerDuplicateVerifyPayload, OfficerDuplicateVerifyResponse, AIModelStatus
 } from '../types';
 
 /**
@@ -389,6 +391,7 @@ export const api = {
     decision: string;
     resolution_notes: string;
     reconciled_action?: string;
+    coordination_title?: string;
   }): Promise<any> {
     const res = await fetch(`${API_BASE}/action-conflicts/${id}/review`, {
       method: 'POST',
@@ -398,9 +401,111 @@ export const api = {
     return handleResponse(res);
   },
 
+  async scanAllActionConflicts(): Promise<any> {
+    const res = await fetch(`${API_BASE}/action-conflicts/scan-all`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async scanResponsibilityOverlaps(): Promise<any> {
+    const res = await fetch(`${API_BASE}/overlaps/scan-responsibility`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
   // Coordination Workspaces
   async getCoordinationWorkspaces(): Promise<CoordinationWorkspace[]> {
     const res = await fetch(`${API_BASE}/coordination`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async createCoordinationWorkspace(payload: {
+    title: string;
+    institution_id: number;
+    primary_bureau_id: number;
+    secondary_bureau_id?: number;
+    justification?: string;
+    linked_case_ids?: string[];
+    participant_ids?: number[];
+  }): Promise<CoordinationWorkspace> {
+    const res = await fetch(`${API_BASE}/coordination`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async updateCoordinationWorkspace(id: number, payload: Partial<CoordinationWorkspace>): Promise<CoordinationWorkspace> {
+    const res = await fetch(`${API_BASE}/coordination/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async resolveCoordinationWorkspace(id: number, payload: {
+    resolution_status: string;
+    consensus_decisions: string;
+    apply_to_cases?: boolean;
+  }): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/${id}/resolve`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async reopenCoordinationWorkspace(id: number, justification: string): Promise<any> {
+    const url = buildApiUrl(`/coordination/${id}/reopen`, { justification });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async addCoordinationParticipant(workspaceId: number, payload: {
+    officer_id: number;
+    bureau_id: number;
+    role?: string;
+  }): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/${workspaceId}/participants`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async removeCoordinationParticipant(workspaceId: number, officerId: number): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/${workspaceId}/participants/${officerId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async linkCaseToWorkspace(workspaceId: number, caseId: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/${workspaceId}/cases`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ case_id: caseId })
+    });
+    return handleResponse(res);
+  },
+
+  async unlinkCaseFromWorkspace(workspaceId: number, caseId: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/${workspaceId}/cases/${caseId}`, {
+      method: 'DELETE',
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -426,6 +531,52 @@ export const api = {
     const url = buildApiUrl(`/coordination/tasks/${taskId}`, { status, remarks });
     const res = await fetch(url, {
       method: 'PATCH',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async updateCoordinationTaskExtended(taskId: number, payload: {
+    status?: string;
+    remarks?: string;
+    priority?: string;
+    due_date?: string;
+    depends_on_task_id?: number;
+    evidence_doc_id?: number;
+  }): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async recordWorkspaceMeeting(workspaceId: number, payload: {
+    meeting_date?: string;
+    chair_name?: string;
+    attendee_ids?: number[];
+    discussion_summary: string;
+    action_items?: string[];
+  }): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/${workspaceId}/meetings`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async scanEscalations(): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/escalations/scan`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getEscalationSummary(): Promise<any> {
+    const res = await fetch(`${API_BASE}/coordination/escalations/summary`, {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
@@ -881,5 +1032,83 @@ export const api = {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(downloadUrl);
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 6: AI-Powered Semantic Duplicate Detection APIs
+  // ---------------------------------------------------------------------------
+
+  async getAiModelStatus(): Promise<AIModelStatus> {
+    const res = await fetch(`${API_BASE}/ai/model/status`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async analyzeComplaintDuplicates(
+    complaintId: string,
+    limit: number = 5,
+    minSimilarity: number = 0.40,
+    includeCrossInstitution: boolean = false
+  ): Promise<AIDuplicateAnalysis> {
+    const url = buildApiUrl(`/ai/duplicates/${complaintId}/analyze`, {
+      limit,
+      min_similarity: minSimilarity,
+      include_cross_institution: includeCrossInstitution
+    });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplaintDuplicateSummary(complaintId: string): Promise<AIDuplicateDetail> {
+    const res = await fetch(`${API_BASE}/ai/duplicates/${complaintId}`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getComplaintDuplicateCandidates(
+    complaintId: string,
+    params?: { min_similarity?: number; tier?: string; status?: string; limit?: number }
+  ): Promise<AIDuplicateCandidate[]> {
+    const url = buildApiUrl(`/ai/duplicates/${complaintId}/candidates`, params);
+    const res = await fetch(url, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async verifyDuplicateRecommendation(
+    complaintId: string,
+    payload: OfficerDuplicateVerifyPayload
+  ): Promise<OfficerDuplicateVerifyResponse> {
+    const res = await fetch(`${API_BASE}/ai/duplicates/${complaintId}/verify`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async getPendingDuplicateRecommendations(
+    params?: { institution_id?: number; tier?: string; limit?: number }
+  ): Promise<AIDuplicateCandidate[]> {
+    const url = buildApiUrl('/ai/duplicates/recommendations/pending', params);
+    const res = await fetch(url, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
   }
+};
+
+export const aiDuplicatesApi = {
+  getModelStatus: api.getAiModelStatus,
+  analyzeComplaint: api.analyzeComplaintDuplicates,
+  getSummary: api.getComplaintDuplicateSummary,
+  getCandidates: api.getComplaintDuplicateCandidates,
+  verify: api.verifyDuplicateRecommendation,
+  getPending: api.getPendingDuplicateRecommendations
 };

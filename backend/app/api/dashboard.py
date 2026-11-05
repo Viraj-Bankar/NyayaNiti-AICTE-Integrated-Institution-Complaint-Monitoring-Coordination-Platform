@@ -6,7 +6,7 @@ from sqlalchemy import func, desc
 from app.database import get_db
 from app.models.models import (
     Case, Bureau, Institution, OverlapAlert, ActionConflictAlert,
-    CoordinationWorkspace, CaseEvent, Notification, User
+    CoordinationWorkspace, CoordinationTask, CaseEvent, Notification, User
 )
 from app.schemas.schemas import DashboardKpis, AlertTickerItem
 from app.api.auth import get_current_user, get_current_user_optional
@@ -54,6 +54,15 @@ def get_dashboard_kpis(
         ActionConflictAlert.status.in_(["Pending Review", "Clarification Requested"])
     ).scalar() or 0
     
+    # Phase 7 Coordination KPI metrics
+    active_workspaces = db.query(func.count(CoordinationWorkspace.id)).filter(
+        CoordinationWorkspace.status.in_(["In Coordination", "Awaiting Review", "Awaiting Decision"])
+    ).scalar() or 0
+    
+    coord_tasks_pending = db.query(func.count(CoordinationTask.id)).filter(
+        CoordinationTask.status.in_(["Pending", "In Progress", "Blocked"])
+    ).scalar() or 0
+    
     # Harmonized combined totals for legacy dashboard cards
     combined_pending = pending + submitted
     combined_under_process = under_process + under_review + in_progress + additional_info
@@ -68,6 +77,8 @@ def get_dashboard_kpis(
         "overdue": overdue,
         "potential_overlaps_awaiting_review": overlaps_awaiting,
         "action_conflicts_awaiting_review": conflicts_awaiting,
+        "active_coordination_workspaces": active_workspaces,
+        "coordination_tasks_pending": coord_tasks_pending,
         "new_intake_complaints": new_intake,
         "submitted": submitted,
         "under_review": under_review,

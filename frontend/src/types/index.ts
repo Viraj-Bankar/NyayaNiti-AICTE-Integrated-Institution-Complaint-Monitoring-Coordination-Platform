@@ -184,10 +184,11 @@ export interface ActionConflictAlert {
   rule_triggered: string;
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
   evidence?: any;
-  status: 'Pending Review' | 'Confirmed Conflict' | 'Clarification Requested' | 'Referred to Bureau Head' | 'Resolved' | 'Rejected';
+  status: 'Pending Review' | 'Confirmed Conflict' | 'Clarification Requested' | 'Referred to Bureau Head' | 'Resolved' | 'Rejected' | 'In Coordination' | string;
   reviewer_id?: number;
   resolution_notes?: string;
   reconciled_action?: string;
+  coordination_workspace_id?: number;
   created_at: string;
   case_a?: CaseItem;
   case_b?: CaseItem;
@@ -203,9 +204,33 @@ export interface CoordinationTask {
   bureau_id: number;
   bureau_code?: string;
   due_date: string;
-  priority: string;
-  status: 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
+  priority: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+  status: 'Pending' | 'In Progress' | 'Blocked' | 'Completed' | 'Overdue' | 'Cancelled' | string;
   remarks?: string;
+  depends_on_task_id?: number;
+  evidence_doc_id?: number;
+}
+
+export interface CoordinationParticipant {
+  id: number;
+  workspace_id: number;
+  officer_id: number;
+  officer_name?: string;
+  bureau_id: number;
+  bureau_code?: string;
+  role: 'Lead Coordinator' | 'Co-Lead' | 'Participant Officer' | 'Reviewer' | 'Observer' | string;
+  joined_at: string;
+}
+
+export interface MeetingRecord {
+  meeting_id: number;
+  meeting_date: string;
+  chair_name: string;
+  recorded_by_id?: number;
+  recorded_by_name?: string;
+  attendee_ids: number[];
+  discussion_summary: string;
+  action_items: string[];
 }
 
 export interface CoordinationWorkspace {
@@ -219,12 +244,22 @@ export interface CoordinationWorkspace {
   secondary_bureau_code?: string;
   coordination_owner_id: number;
   coordination_owner_name: string;
-  status: string;
+  status: 'In Coordination' | 'Awaiting Review' | 'Awaiting Decision' | 'Completed' | 'Closed with Justification' | string;
   justification?: string;
   decisions?: string;
+  meeting_records?: MeetingRecord[];
   linked_case_ids: string[];
+  participants?: CoordinationParticipant[];
   tasks: CoordinationTask[];
   created_at: string;
+}
+
+export interface EscalationSummary {
+  overdue_tasks: number;
+  approaching_deadlines: number;
+  unresolved_conflicts_72h: number;
+  stalled_workspaces_14d: number;
+  evaluated_at: string;
 }
 
 export interface DashboardKpis {
@@ -236,6 +271,8 @@ export interface DashboardKpis {
   overdue: number;
   potential_overlaps_awaiting_review: number;
   action_conflicts_awaiting_review: number;
+  active_coordination_workspaces?: number;
+  coordination_tasks_pending?: number;
   new_intake_complaints?: number;
   submitted?: number;
   under_review?: number;
@@ -548,6 +585,13 @@ export interface OfficerComplaintDetail {
     remarks?: string;
     assigned_at: string;
   }[];
+  coordination_workspaces?: {
+    workspace_id: number;
+    title: string;
+    status: string;
+    primary_bureau_code: string;
+    linked_at?: string;
+  }[];
 }
 
 export interface OfficerComplaintAcceptPayload {
@@ -588,6 +632,132 @@ export interface OfficerComplaintResolvePayload {
 export interface OfficerComplaintClosePayload {
   closure_remarks?: string;
 }
+
+// -------------------------------------------------------------------------
+// Phase 6: AI Duplicate Complaint Detection Types
+// -------------------------------------------------------------------------
+
+export interface AIDuplicateFeatures {
+  cosine_similarity: number;
+  l1_distance: number;
+  l2_distance: number;
+  diff_mean: number;
+  diff_max: number;
+  diff_std: number;
+  prod_mean: number;
+  prod_std: number;
+  fuzz_token_set_ratio: number;
+  fuzz_token_sort_ratio: number;
+  length_ratio: number;
+  same_institution: number;
+  same_category: number;
+}
+
+export type AIDuplicateTier =
+  | 'HIGH_CONFIDENCE_DUPLICATE'
+  | 'MANUAL_REVIEW_REQUIRED'
+  | 'DISTINCT_MATTERS';
+
+export type AIDuplicateVerificationStatus =
+  | 'PENDING_REVIEW'
+  | 'CONFIRMED_DUPLICATE'
+  | 'MARKED_RELATED'
+  | 'REJECTED';
+
+export interface AIDuplicateCandidate {
+  recommendation_id?: number;
+  source_complaint_id: string;
+  candidate_complaint_id: string;
+  candidate_title?: string;
+  candidate_category: string;
+  candidate_institution_id: number;
+  candidate_institution_name: string;
+  candidate_status: string;
+  candidate_date_received: string;
+  predicted_relationship: AIDuplicateTier;
+  similarity_score: number; // Cosine similarity metric [-1.0, 1.0] (strictly distinguished from probability)
+  duplicate_probability: number; // Calibrated SVM probability [0.0, 1.0]
+  svm_decision: boolean;
+  institution_match: boolean;
+  category_match: boolean;
+  matching_features: AIDuplicateFeatures;
+  explanation: string;
+  statutory_advice: string;
+  verification_status: AIDuplicateVerificationStatus;
+  verification_reason?: string;
+  model_version: string;
+}
+
+export interface AIDuplicateAnalysis {
+  source_complaint_id: string;
+  source_title?: string;
+  source_institution_id: number;
+  source_institution_name: string;
+  total_candidates_evaluated: number;
+  high_confidence_count: number;
+  review_required_count: number;
+  candidates: AIDuplicateCandidate[];
+  model_name: string;
+  model_version: string;
+  vector_search_engine: string;
+  analyzed_at: string;
+}
+
+export interface AIDuplicateDetail {
+  complaint_id: string;
+  complaint_title?: string;
+  institution_id: number;
+  institution_name: string;
+  total_candidates_analyzed: number;
+  high_confidence_duplicates_count: number;
+  review_required_count: number;
+  top_recommendation?: AIDuplicateCandidate;
+  has_active_recommendations: boolean;
+  model_version: string;
+  last_analyzed_at?: string;
+}
+
+export interface OfficerDuplicateVerifyPayload {
+  candidate_id: string;
+  decision: 'CONFIRM_DUPLICATE' | 'MARK_RELATED' | 'REJECT_RECOMMENDATION';
+  reason: string;
+  link_dossier?: boolean;
+}
+
+export interface OfficerDuplicateVerifyResponse {
+  status: string;
+  message: string;
+  source_complaint_id: string;
+  candidate_complaint_id: string;
+  decision: string;
+  linked_relationship_id?: number;
+  verified_at: string;
+  verified_by: string;
+}
+
+export interface AIModelStatus {
+  model_name: string;
+  model_version: string;
+  is_available: boolean;
+  embedding_dim: number;
+  device: string;
+  feature_count: number;
+  feature_names: string[];
+  best_hyperparameters: {
+    C?: number;
+    gamma?: number | string;
+    kernel?: string;
+  };
+  decision_thresholds: {
+    high_confidence_duplicate: number;
+    manual_review_required: number;
+  };
+  vector_engine: string;
+  pgvector_status: string;
+  pgvector_note: string;
+  statutory_safeguard: string;
+}
+
 
 
 

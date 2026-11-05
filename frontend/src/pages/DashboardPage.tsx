@@ -5,6 +5,7 @@ import { api, API_BASE } from '../services/api';
 import { DashboardKpis } from '../types';
 import { AlertTicker } from '../components/common/AlertTicker';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { AIDashboardWidget } from '../components/ai/AIDashboardWidget';
 import {
   FileText, Clock, CheckCircle2, ArrowRight, AlertTriangle,
   GitMerge, ShieldAlert, TrendingUp, Sparkles, Download,
@@ -294,6 +295,46 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Phase 7 Cross-Bureau Coordination Hub Banner */}
+        <div className="bg-gradient-to-r from-[#092D62] to-[#1E5AA8] rounded-lg p-4 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-white/10 rounded-lg backdrop-blur-xs">
+              <Layers className="w-5 h-5 text-[#FFB900]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold tracking-wide">
+                  Cross-Bureau Coordination & Conflict Intelligence
+                </h3>
+                <span className="text-[10px] font-bold bg-[#FFB900] text-[#061E46] px-2 py-0.5 rounded">
+                  AICTE Phase 7
+                </span>
+              </div>
+              <p className="text-xs text-slate-200 mt-0.5">
+                Active Joint Workspaces: <strong className="text-white font-mono">{renderKpiValue(kpis?.active_coordination_workspaces)}</strong> |
+                Pending Shared Tasks: <strong className="text-white font-mono ml-1">{renderKpiValue(kpis?.coordination_tasks_pending)}</strong> |
+                Unresolved Action Conflicts: <strong className="text-white font-mono ml-1">{renderKpiValue(kpis?.action_conflicts_awaiting_review)}</strong>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/action-conflicts')}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+              <span>Conflicts Center</span>
+            </button>
+            <button
+              onClick={() => navigate('/coordination')}
+              className="px-3.5 py-1.5 bg-[#FFB900] hover:bg-amber-400 text-[#061E46] rounded text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            >
+              <span>Coordination Hub</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
         {/* 3. Recharts Visual Analytics (Live Backend Data) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Chart 1: Bureau Workload (Active vs Disposed) */}
@@ -530,6 +571,9 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* AI-Powered Semantic Duplicate Detection & Coordination Intelligence (Phase 6) */}
+        <AIDashboardWidget />
 
         {/* 4. Bottom Grid: Upcoming Deadlines & Recent Chronological Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

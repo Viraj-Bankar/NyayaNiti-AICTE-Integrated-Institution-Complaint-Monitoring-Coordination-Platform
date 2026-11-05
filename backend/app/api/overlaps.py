@@ -162,7 +162,8 @@ def review_overlap_decision(
             event_type="COORDINATION_INITIATED",
             actor_id=current_user.id,
             actor_name=current_user.full_name,
-            remarks=f"Cross-Bureau Coordination launched with {alert.case_b_id}. Workspace #{workspace.id}. Notes: {review_in.review_notes}"
+            remarks=f"Cross-Bureau Coordination launched with {alert.case_b_id}. Workspace #{workspace.id}. Notes: {review_in.review_notes}",
+            is_public=False
         )
         record_case_event(
             db=db,
@@ -170,7 +171,8 @@ def review_overlap_decision(
             event_type="COORDINATION_INITIATED",
             actor_id=current_user.id,
             actor_name=current_user.full_name,
-            remarks=f"Cross-Bureau Coordination launched with {alert.case_a_id}. Workspace #{workspace.id}. Notes: {review_in.review_notes}"
+            remarks=f"Cross-Bureau Coordination launched with {alert.case_a_id}. Workspace #{workspace.id}. Notes: {review_in.review_notes}",
+            is_public=False
         )
         
     elif review_in.decision == "PROCEED_SEPARATELY":
@@ -218,7 +220,11 @@ def review_overlap_decision(
         remarks=review_in.review_notes
     )
     
-    return {"message": f"Overlap decision recorded: {review_in.decision}", "alert_id": alert.id}
+    return {
+        "message": f"Overlap decision recorded: {review_in.decision}",
+        "alert_id": alert.id,
+        "coordination_workspace_id": getattr(alert, "coordination_workspace_id", None)
+    }
 
 @router.post("/scan-all")
 def trigger_full_cross_bureau_scan(
@@ -284,4 +290,20 @@ def trigger_full_cross_bureau_scan(
         "status": "success",
         "new_overlaps_detected": created_count,
         "model": get_model_info()
+    }
+
+@router.post("/scan-responsibility")
+def trigger_responsibility_overlap_scan(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["super_admin", "bureau_head", "authorized_officer"]))
+):
+    """
+    Executes a deterministic scan based on institution responsibility and bureau jurisdiction.
+    """
+    from app.services.overlap_engine import scan_all_responsibility_overlaps
+    res = scan_all_responsibility_overlaps(db)
+    return {
+        "status": "success",
+        "message": "Deterministic responsibility overlap scan complete",
+        "results": res
     }

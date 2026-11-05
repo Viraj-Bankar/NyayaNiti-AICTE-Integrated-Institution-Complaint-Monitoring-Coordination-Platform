@@ -1,0 +1,15 @@
+{
+  "binary": {
+    "0": "Non-Duplicate (Distinct Institutional Matter)",
+    "1": "Duplicate (Identical Allegation / Re-Filed Matter)"
+  },
+  "multiclass": {
+    "0": "Distinct Matter",
+    "1": "True Duplicate Matter",
+    "2": "Related Matter / Common Institution Overlap"
+  },
+  "decision_thresholds": {
+    "high_confidence_duplicate": 0.85,
+    "review_required_overlap": 0.6
+  }
+}

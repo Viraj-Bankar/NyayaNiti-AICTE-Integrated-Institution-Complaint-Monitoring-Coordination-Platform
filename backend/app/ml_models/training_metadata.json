@@ -1,0 +1,32 @@
+{
+  "version": "v1.0.0-phase6-mpnet-svm",
+  "training_timestamp": "2026-11-04T12:57:06.861276Z",
+  "model_type": "Support Vector Classifier with RBF Kernel and Platt Scaling",
+  "best_hyperparameters": {
+    "C": 1.0,
+    "gamma": 0.01,
+    "kernel": "rbf"
+  },
+  "cross_validation_splits": 3,
+  "best_cv_f1_score": 0.9333,
+  "feature_count": 13,
+  "feature_names": [
+    "cosine_similarity",
+    "l1_distance",
+    "l2_distance",
+    "diff_mean",
+    "diff_max",
+    "diff_std",
+    "prod_mean",
+    "prod_std",
+    "fuzz_token_set_ratio",
+    "fuzz_token_sort_ratio",
+    "length_ratio",
+    "same_institution",
+    "same_category"
+  ],
+  "train_samples": 16,
+  "val_samples": 3,
+  "test_samples": 5,
+  "class_weight": "balanced"
+}

@@ -36,6 +36,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def ensure_schema():
+    import app.models.models  # noqa: F401 - ensure all declarative models are registered on Base
     Base.metadata.create_all(bind=engine)
     try:
         inspector = inspect(engine)
@@ -111,6 +112,20 @@ def ensure_schema():
                 notif_cols = [c["name"] for c in inspector.get_columns("notifications")]
                 if "complainant_id" not in notif_cols:
                     conn.execute(text("ALTER TABLE notifications ADD COLUMN complainant_id INTEGER REFERENCES complainants(id)"))
+
+            # 5. CoordinationTasks table enhancements
+            if "coordination_tasks" in tables:
+                task_cols = [c["name"] for c in inspector.get_columns("coordination_tasks")]
+                if "depends_on_task_id" not in task_cols:
+                    conn.execute(text("ALTER TABLE coordination_tasks ADD COLUMN depends_on_task_id INTEGER REFERENCES coordination_tasks(id)"))
+                if "evidence_doc_id" not in task_cols:
+                    conn.execute(text("ALTER TABLE coordination_tasks ADD COLUMN evidence_doc_id INTEGER REFERENCES document_metadata(id)"))
+
+            # 6. ActionConflictAlerts table enhancements
+            if "action_conflict_alerts" in tables:
+                conflict_cols = [c["name"] for c in inspector.get_columns("action_conflict_alerts")]
+                if "coordination_workspace_id" not in conflict_cols:
+                    conn.execute(text("ALTER TABLE action_conflict_alerts ADD COLUMN coordination_workspace_id INTEGER REFERENCES coordination_workspaces(id)"))
 
             conn.commit()
     except Exception as e:

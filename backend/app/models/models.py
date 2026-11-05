@@ -150,6 +150,12 @@ class Case(Base):
     events = relationship("CaseEvent", back_populates="case", cascade="all, delete-orphan", order_by="CaseEvent.timestamp.desc()")
     documents = relationship("DocumentMetadata", back_populates="case", cascade="all, delete-orphan")
     assignments = relationship("CaseAssignment", cascade="all, delete-orphan", order_by="CaseAssignment.assigned_at.desc()")
+    ai_duplicate_candidates = relationship(
+        "AIDuplicateRecommendation",
+        foreign_keys="AIDuplicateRecommendation.source_case_id",
+        cascade="all, delete-orphan",
+        order_by="AIDuplicateRecommendation.duplicate_probability.desc()"
+    )
 
 class CaseEvent(Base):
     __tablename__ = "case_events"
@@ -236,10 +242,12 @@ class ActionConflictAlert(Base):
     reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolution_notes = Column(Text, nullable=True)
     reconciled_action = Column(Text, nullable=True)
+    coordination_workspace_id = Column(Integer, ForeignKey("coordination_workspaces.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     institution = relationship("Institution", back_populates="action_conflicts")
+    coordination_workspace = relationship("CoordinationWorkspace")
 
 class CoordinationWorkspace(Base):
     __tablename__ = "coordination_workspaces"
@@ -258,6 +266,9 @@ class CoordinationWorkspace(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     institution = relationship("Institution", back_populates="coordination_workspaces")
+    primary_bureau = relationship("Bureau", foreign_keys=[primary_bureau_id])
+    secondary_bureau = relationship("Bureau", foreign_keys=[secondary_bureau_id])
+    coordination_owner = relationship("User", foreign_keys=[coordination_owner_id])
     tasks = relationship("CoordinationTask", back_populates="workspace", cascade="all, delete-orphan")
     participants = relationship("CoordinationParticipant", back_populates="workspace", cascade="all, delete-orphan")
 
@@ -272,6 +283,8 @@ class CoordinationParticipant(Base):
     joined_at = Column(DateTime, default=datetime.utcnow)
     
     workspace = relationship("CoordinationWorkspace", back_populates="participants")
+    officer = relationship("User", foreign_keys=[officer_id])
+    bureau = relationship("Bureau", foreign_keys=[bureau_id])
 
 class CoordinationTask(Base):
     __tablename__ = "coordination_tasks"
@@ -286,10 +299,14 @@ class CoordinationTask(Base):
     priority = Column(String(50), default="Medium")  # 'Critical', 'High', 'Medium', 'Low'
     status = Column(String(50), default="Pending")  # 'Pending', 'In Progress', 'Completed', 'Overdue'
     remarks = Column(Text, nullable=True)
+    depends_on_task_id = Column(Integer, ForeignKey("coordination_tasks.id"), nullable=True)
+    evidence_doc_id = Column(Integer, ForeignKey("document_metadata.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     workspace = relationship("CoordinationWorkspace", back_populates="tasks")
+    depends_on = relationship("CoordinationTask", remote_side=[id], backref="dependent_tasks")
+    evidence_document = relationship("DocumentMetadata", foreign_keys=[evidence_doc_id])
 
 class CaseCoordinationLink(Base):
     __tablename__ = "case_coordination_links"
@@ -297,6 +314,9 @@ class CaseCoordinationLink(Base):
     id = Column(Integer, primary_key=True, index=True)
     workspace_id = Column(Integer, ForeignKey("coordination_workspaces.id"), nullable=False, index=True)
     case_id = Column(String(100), ForeignKey("cases.id"), nullable=False, index=True)
+
+    workspace = relationship("CoordinationWorkspace", foreign_keys=[workspace_id])
+    case = relationship("Case", foreign_keys=[case_id])
 
 class PriorityEvaluation(Base):
     __tablename__ = "priority_evaluations"
@@ -390,3 +410,32 @@ class SystemConfiguration(Base):
     description = Column(Text, nullable=True)
     updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class AIDuplicateRecommendation(Base):
+    __tablename__ = "ai_duplicate_recommendations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    source_case_id = Column(String(100), ForeignKey("cases.id"), nullable=False, index=True)
+    candidate_case_id = Column(String(100), ForeignKey("cases.id"), nullable=False, index=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False, index=True)
+    similarity_score = Column(Float, nullable=False)  # Cosine similarity in [-1.0, 1.0]
+    duplicate_probability = Column(Float, nullable=False)  # Calibrated SVM probability in [0.0, 1.0]
+    predicted_tier = Column(String(50), nullable=False)  # 'HIGH_CONFIDENCE_DUPLICATE', 'MANUAL_REVIEW_REQUIRED', 'DISTINCT_MATTERS'
+    is_duplicate_predicted = Column(Boolean, default=False)
+    features = Column(JSON, nullable=True)  # Explainable 13-dim pairwise features
+    explanation = Column(Text, nullable=True)
+    statutory_advice = Column(Text, nullable=True)
+    model_version = Column(String(100), default="v1.0.0-phase6-mpnet-svm")
+    verification_status = Column(String(50), default="PENDING_REVIEW", index=True)  # 'PENDING_REVIEW', 'CONFIRMED_DUPLICATE', 'MARKED_RELATED', 'REJECTED'
+    verified_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    verification_reason = Column(Text, nullable=True)
+    verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    source_case = relationship("Case", foreign_keys=[source_case_id], back_populates="ai_duplicate_candidates")
+    candidate_case = relationship("Case", foreign_keys=[candidate_case_id])
+    institution = relationship("Institution", foreign_keys=[institution_id])
+    verified_by = relationship("User", foreign_keys=[verified_by_id])
+

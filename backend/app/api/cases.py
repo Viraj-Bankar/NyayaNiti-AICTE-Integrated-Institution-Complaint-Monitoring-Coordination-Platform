@@ -7,7 +7,7 @@ from sqlalchemy import desc, asc, func
 from app.database import get_db
 from app.models.models import (
     Case, CaseEvent, User, Bureau, Institution, OverlapAlert, ActionConflictAlert, Notification,
-    CaseAssignment, Complainant, CaseRelationship
+    CaseAssignment, Complainant, CaseRelationship, CaseCoordinationLink, CoordinationWorkspace
 )
 from app.schemas.schemas import (
     CaseResponse, CaseDetailResponse, CaseCreate, CaseUpdate, PriorityOverrideRequest,
@@ -261,6 +261,21 @@ def get_case_detail(
             "created_at": rel.created_at
         })
     data["linked_cases"] = linked_list
+
+    # Coordination Workspaces (Phase 7)
+    links = db.query(CaseCoordinationLink).filter(CaseCoordinationLink.case_id == c.id).all()
+    coord_workspaces = []
+    for l in links:
+        ws = db.query(CoordinationWorkspace).filter(CoordinationWorkspace.id == l.workspace_id).first()
+        if ws:
+            coord_workspaces.append({
+                "workspace_id": ws.id,
+                "title": ws.title,
+                "status": ws.status,
+                "primary_bureau_code": ws.primary_bureau.code if ws.primary_bureau else "N/A",
+                "linked_at": ws.created_at.isoformat() if getattr(ws, "created_at", None) else None
+            })
+    data["coordination_workspaces"] = coord_workspaces
 
     return data
 
@@ -576,6 +591,14 @@ def update_case(
     db.commit()
     db.refresh(c)
     
+    # Dynamic Phase 7 Trigger: Evaluate Action Conflicts on action or status mutation
+    if update_data.last_action or update_data.status:
+        try:
+            from app.services.conflict_engine import detect_action_conflicts_for_case
+            detect_action_conflicts_for_case(db, c.id)
+        except Exception as e:
+            print(f"Dynamic conflict check note: {e}")
+
     log_audit_event(
         db=db,
         actor_id=current_user.id,

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AICTEIndividualComplaint",
+  "description": "Standardized schema for individual institutional complaint records in NyayaNiti",
+  "type": "object",
+  "required": [
+    "complaint_id",
+    "complaint_title",
+    "complaint_description",
+    "institution_id",
+    "complaint_category",
+    "submission_date"
+  ],
+  "properties": {
+    "complaint_id": {
+      "type": "string",
+      "description": "Authoritative AICTE statutory reference number (e.g., AICTE-RB-2024-0101, AICTE-PGRC-2026-1021)"
+    },
+    "complaint_title": {
+      "type": "string",
+      "description": "Formal subject summary or short description of the grievance"
+    },
+    "complaint_description": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Substantive narrative of the institutional complaint allegation"
+    },
+    "institution_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Foreign key reference to AICTE verified technical institution"
+    },
+    "complaint_category": {
+      "type": "string",
+      "description": "Official AICTE grievance taxonomy category"
+    },
+    "submission_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 statutory submission or receipt timestamp"
+    },
+    "institution_name": {
+      "type": "string",
+      "description": "Official registered name of the technical institution"
+    },
+    "permanent_id": {
+      "type": "string",
+      "description": "Authoritative AICTE permanent application identifier (e.g. 1-10293847)"
+    },
+    "status": {
+      "type": "string",
+      "description": "Current lifecycle status of the complaint"
+    }
+  },
+  "additionalProperties": false
+}
+

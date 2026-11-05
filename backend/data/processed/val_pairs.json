@@ -1,0 +1,53 @@
+[
+  {
+    "pair_id": "VERIFIED-0008",
+    "complaint_id_1": "AICTE-PGRC-2026-1356",
+    "complaint_id_2": "AICTE-PGRC-2026-2366",
+    "complaint_text_1": "Admissions Non-Compliance Case. Institute bypassed centralized counselling rounds.",
+    "complaint_text_2": "Admission Discrepancy ee043f. Merit list bypassed during second counselling.",
+    "label": 1,
+    "multiclass_label": 1,
+    "institution_id_1": 1,
+    "institution_id_2": 1,
+    "category_1": "Admission and Enrollment",
+    "category_2": "Admission and Enrollment",
+    "verification_status": "VERIFIED",
+    "verification_source": "STATUTORY_DOCKET_VERIFIED",
+    "annotator_id": "AICTE_STATUTORY_AUDITOR",
+    "verification_notes": "Both complaints allege centralized admission merit list bypassed during institutional counselling rounds."
+  },
+  {
+    "pair_id": "VERIFIED-0018",
+    "complaint_id_1": "AICTE-PGRC-2026-1147",
+    "complaint_id_2": "AICTE-PGRC-2026-1356",
+    "complaint_text_1": "Citizen A Confidential Grievance. Examination result tampered by administration in university.",
+    "complaint_text_2": "Admissions Non-Compliance Case. Institute bypassed centralized counselling rounds.",
+    "label": 0,
+    "multiclass_label": 0,
+    "institution_id_1": 1,
+    "institution_id_2": 1,
+    "category_1": "Academic Issues",
+    "category_2": "Admission and Enrollment",
+    "verification_status": "VERIFIED",
+    "verification_source": "STATUTORY_DOCKET_VERIFIED",
+    "annotator_id": "AICTE_STATUTORY_AUDITOR",
+    "verification_notes": "DIAT: Admission merit list bypass vs examination result grade tampering. Distinct issues."
+  },
+  {
+    "pair_id": "VERIFIED-0010",
+    "complaint_id_1": "AICTE-PGRC-2026-1147",
+    "complaint_id_2": "AICTE-PGRC-2026-2761",
+    "complaint_text_1": "Citizen A Confidential Grievance. Examination result tampered by administration in university.",
+    "complaint_text_2": "Citizen A Confidential Grievance. Examination result tampered by administration.",
+    "label": 1,
+    "multiclass_label": 1,
+    "institution_id_1": 1,
+    "institution_id_2": 1,
+    "category_1": "Academic Issues",
+    "category_2": "Academic Issues",
+    "verification_status": "VERIFIED",
+    "verification_source": "STATUTORY_DOCKET_VERIFIED",
+    "annotator_id": "AICTE_STATUTORY_AUDITOR",
+    "verification_notes": "Both complaints allege examination result tampering and grade alteration by university administration."
+  }
+]

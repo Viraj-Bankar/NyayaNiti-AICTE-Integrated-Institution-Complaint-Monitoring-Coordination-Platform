@@ -6,7 +6,8 @@ from app.api import (
     auth, institutions, cases, overlaps, action_conflicts,
     coordination, dashboard, surges, reports, notifications,
     audit, documents, settings as admin_settings,
-    complainant_auth, complainant_cases, officer_complaints
+    complainant_auth, complainant_cases, officer_complaints,
+    ai_duplicates
 )
 from app.seed_data import seed_database
 
@@ -56,6 +57,7 @@ app.include_router(audit.router, prefix=settings.API_V1_PREFIX)
 app.include_router(documents.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin_settings.router, prefix=settings.API_V1_PREFIX)
 app.include_router(officer_complaints.router, prefix=settings.API_V1_PREFIX)
+app.include_router(ai_duplicates.router, prefix=settings.API_V1_PREFIX)
 
 # Include routers - Citizen & Complainant Space
 app.include_router(complainant_auth.router, prefix=settings.API_V1_PREFIX)

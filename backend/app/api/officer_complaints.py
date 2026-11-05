@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.models import (
     Case, CaseEvent, User, Bureau, Institution, Notification,
     CaseAssignment, Complainant, CaseRelationship, DocumentMetadata, AuditLog,
-    ComplaintCategory
+    ComplaintCategory, CaseCoordinationLink, CoordinationWorkspace
 )
 from app.schemas.schemas import (
     OfficerComplaintItem, OfficerComplaintListResponse,
@@ -404,7 +404,19 @@ def get_officer_complaint_detail(
         "public_history": public_events,
         "internal_notes": internal_notes,
         "linked_cases": linked_cases,
-        "assignments": assignments
+        "assignments": assignments,
+        "coordination_workspaces": [
+            {
+                "workspace_id": ws.id,
+                "title": ws.title,
+                "status": ws.status,
+                "primary_bureau_code": ws.primary_bureau.code if ws.primary_bureau else "N/A",
+                "linked_at": ws.created_at.isoformat() if getattr(ws, "created_at", None) else None
+            }
+            for l in db.query(CaseCoordinationLink).filter(CaseCoordinationLink.case_id == c.id).all()
+            for ws in [db.query(CoordinationWorkspace).filter(CoordinationWorkspace.id == l.workspace_id).first()]
+            if ws is not None
+        ]
     }
 
 # -------------------------------------------------------------------------

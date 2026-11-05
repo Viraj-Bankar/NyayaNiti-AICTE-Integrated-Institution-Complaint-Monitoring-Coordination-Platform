@@ -7,11 +7,13 @@ import {
 } from '../types';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { Modal } from '../components/common/Modal';
+import { AIDuplicatePanel } from '../components/ai/AIDuplicatePanel';
+import { CreateWorkspaceModal } from '../components/coordination/CreateWorkspaceModal';
 import {
   ArrowLeft, Building2, Calendar, Clock, Download, FileText,
   User as UserIcon, Shield, AlertTriangle, CheckCircle2,
   XCircle, HelpCircle, UserPlus, GitMerge, Paperclip,
-  ExternalLink, Lock, RefreshCw, Eye, MessageSquare, AlertCircle
+  ExternalLink, Lock, RefreshCw, Eye, MessageSquare, AlertCircle, Layers
 } from 'lucide-react';
 
 export const OfficerComplaintReviewPage: React.FC = () => {
@@ -39,6 +41,7 @@ export const OfficerComplaintReviewPage: React.FC = () => {
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [isCoordinationModalOpen, setIsCoordinationModalOpen] = useState(false);
 
   // Form states
   const [acceptForm, setAcceptForm] = useState({
@@ -408,6 +411,35 @@ export const OfficerComplaintReviewPage: React.FC = () => {
         </div>
       )}
 
+      {/* Active Cross-Bureau Coordination Workspace Alert (Phase 7) */}
+      {complaint.coordination_workspaces && complaint.coordination_workspaces.length > 0 && (
+        <div className="mb-4 bg-blue-50 border-2 border-[#092D62] rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-[#092D62] text-white rounded">
+              <Layers className="w-4 h-4 text-[#FFB900]" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-[#092D62] uppercase tracking-wider bg-blue-100 px-2 py-0.5 rounded">
+                Active Joint Coordination Workspace
+              </span>
+              <p className="text-xs font-bold text-slate-900 mt-1">
+                Workspace #{complaint.coordination_workspaces[0].workspace_id}: {complaint.coordination_workspaces[0].title}
+              </p>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Status: <strong className="text-[#092D62]">{complaint.coordination_workspaces[0].status}</strong> • Lead Bureau: <strong>{complaint.coordination_workspaces[0].primary_bureau_code}</strong>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate(`/coordination?workspaceId=${complaint.coordination_workspaces![0].workspace_id}`)}
+            className="px-3.5 py-1.5 bg-[#092D62] text-white hover:bg-[#072147] text-xs font-bold rounded flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto shrink-0"
+          >
+            <span>Open Joint Workspace</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Official Government Header Card (Feature 3) */}
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
@@ -543,6 +575,19 @@ export const OfficerComplaintReviewPage: React.FC = () => {
               >
                 <GitMerge className="w-3.5 h-3.5" />
                 <span>Link Case</span>
+              </button>
+            )}
+
+            {/* Initiate Coordination Button (Phase 7) */}
+            {canPerformScrutiny && !isTerminalStatus && (
+              <button
+                onClick={() => setIsCoordinationModalOpen(true)}
+                disabled={actionLoading}
+                className="px-3 py-1.5 bg-[#092D62] text-white hover:bg-[#072147] text-xs font-bold rounded shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                title="Convene Multi-Bureau Joint Coordination Workspace"
+              >
+                <Layers className="w-3.5 h-3.5 text-[#FFB900]" />
+                <span>Initiate Coordination</span>
               </button>
             )}
 
@@ -684,6 +729,12 @@ export const OfficerComplaintReviewPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* AI Duplicate & Overlap Intelligence Panel (Phase 6) */}
+          <AIDuplicatePanel
+            complaint={complaint}
+            onVerificationSuccess={loadComplaint}
+          />
 
           {/* Status History & Scrutiny Timeline (Feature 3) */}
           <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs">
@@ -1445,6 +1496,17 @@ export const OfficerComplaintReviewPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+      {/* ============================================================ */}
+      {/* MODAL 7: INITIATE CROSS-BUREAU COORDINATION (Phase 7) */}
+      {/* ============================================================ */}
+      <CreateWorkspaceModal
+        isOpen={isCoordinationModalOpen}
+        onClose={() => setIsCoordinationModalOpen(false)}
+        onCreated={(ws) => {
+          navigate('/coordination?workspaceId=' + ws.id);
+        }}
+        initialCaseId={complaint.id}
+      />
     </div>
   );
 };

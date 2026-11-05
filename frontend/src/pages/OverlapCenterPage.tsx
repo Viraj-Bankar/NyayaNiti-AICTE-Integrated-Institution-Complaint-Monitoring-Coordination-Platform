@@ -59,13 +59,17 @@ export const OverlapCenterPage: React.FC = () => {
     if (!reviewNotes.trim()) return;
     setIsSubmitting(true);
     try {
-      await api.reviewOverlap(selectedAlert!.id, {
+      const res: any = await api.reviewOverlap(selectedAlert!.id, {
         decision,
         review_notes: reviewNotes
       });
       setSelectedAlert(null);
       setReviewNotes('');
       await loadAlerts();
+
+      if (res?.coordination_workspace_id) {
+        navigate(`/coordination?workspaceId=${res.coordination_workspace_id}`);
+      }
     } catch (err: any) {
       alert(`Error submitting decision: ${err.message}`);
     } finally {
@@ -96,6 +100,26 @@ export const OverlapCenterPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={async () => {
+                setIsScanning(true);
+                setScanResult(null);
+                try {
+                  const res = await api.scanResponsibilityOverlaps();
+                  setScanResult(`Deterministic Overlap Scan Complete: Evaluated ${res.results?.pairs_evaluated || 0} pairs. Identified ${res.results?.new_overlaps_detected || 0} jurisdictional overlaps.`);
+                  await loadAlerts();
+                } catch (err: any) {
+                  setScanResult(`Scan error: ${err.message}`);
+                } finally {
+                  setIsScanning(false);
+                }
+              }}
+              disabled={isScanning}
+              className="px-3 py-2 border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+            >
+              <Layers className="w-3.5 h-3.5 text-blue-600" />
+              <span>Scan Jurisdictional Overlaps</span>
+            </button>
             <button
               onClick={handleScanAll}
               disabled={isScanning}

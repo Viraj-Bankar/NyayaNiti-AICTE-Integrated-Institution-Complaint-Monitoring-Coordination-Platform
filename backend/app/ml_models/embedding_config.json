@@ -1,0 +1,8 @@
+{
+  "model_name": "sentence-transformers/all-mpnet-base-v2",
+  "embedding_dim": 768,
+  "normalized": true,
+  "device": "cpu",
+  "pooling": "mean",
+  "version": "v1.0.0-phase6-mpnet-svm"
+}
