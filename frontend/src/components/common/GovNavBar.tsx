@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   Home, LayoutDashboard, Inbox, FileText, GitCompare, AlertTriangle,
   Layers, Building2, CheckCircle2, TrendingUp, BarChart3,
-  ShieldCheck, Settings, Menu, X
+  ShieldCheck, Settings, Menu, X, Award
 } from 'lucide-react';
 
 export const GovNavBar: React.FC = () => {
@@ -30,6 +30,7 @@ export const GovNavBar: React.FC = () => {
     { label: 'Overlap Center', path: '/overlaps', icon: GitCompare, badge: 'AI' },
     { label: 'Action Conflicts', path: '/action-conflicts', icon: AlertTriangle },
     { label: 'Coordination', path: '/coordination', icon: Layers },
+    { label: 'Institutional Governance', path: '/compliance', icon: Award, badge: 'Phase 8' },
     { label: 'Institutions', path: '/institutions', icon: Building2 },
     { label: 'Validation Engine', path: '/validation', icon: CheckCircle2 },
     { label: 'Surge Detection', path: '/surges', icon: TrendingUp },

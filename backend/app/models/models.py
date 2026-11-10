@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Enum, JSON, Index
+    Column, Integer, String, Text, Float, Boolean, DateTime, ForeignKey, Enum, JSON, Index, LargeBinary, func
 )
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -82,6 +82,10 @@ class Institution(Base):
     overlap_alerts = relationship("OverlapAlert", back_populates="institution")
     action_conflicts = relationship("ActionConflictAlert", back_populates="institution")
     coordination_workspaces = relationship("CoordinationWorkspace", back_populates="institution")
+    compliance_assessments = relationship("ComplianceAssessment", back_populates="institution", cascade="all, delete-orphan")
+    corrective_actions = relationship("CorrectiveActionPlan", back_populates="institution", cascade="all, delete-orphan")
+    risk_indicators = relationship("InstitutionalRiskIndicator", back_populates="institution", cascade="all, delete-orphan")
+    compliance_snapshots = relationship("ComplianceScoreSnapshot", back_populates="institution", cascade="all, delete-orphan")
 
 class InstitutionAlias(Base):
     __tablename__ = "institution_aliases"
@@ -384,6 +388,30 @@ class DocumentMetadata(Base):
     upload_timestamp = Column(DateTime, default=datetime.utcnow)
     
     case = relationship("Case", back_populates="documents")
+    binary_record = relationship("DocumentBinary", back_populates="document", uselist=False, cascade="")
+
+class DocumentBinary(Base):
+    """
+    Zero-Cost Persistent Evidence Binary Storage (PostgreSQL BYTEA / SQLite LargeBinary).
+    Stores physical document contents directly in the database with SHA-256 integrity checksums.
+    Configured with restrictive deletion to prevent inadvertent evidence destruction.
+    """
+    __tablename__ = "document_binaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(
+        Integer,
+        ForeignKey("document_metadata.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True
+    )
+    content = Column(LargeBinary, nullable=False)
+    sha256_checksum = Column(String(64), nullable=False)
+    file_size_bytes = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False, index=True)
+
+    document = relationship("DocumentMetadata", back_populates="binary_record")
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
@@ -438,4 +466,181 @@ class AIDuplicateRecommendation(Base):
     candidate_case = relationship("Case", foreign_keys=[candidate_case_id])
     institution = relationship("Institution", foreign_keys=[institution_id])
     verified_by = relationship("User", foreign_keys=[verified_by_id])
+
+# =========================================================================
+# PHASE 8: AUTOMATED INSTITUTIONAL COMPLIANCE & REGULATORY ANALYTICS MODELS
+# =========================================================================
+
+class RegulatoryRequirement(Base):
+    __tablename__ = "regulatory_requirements"
+
+    id = Column(String(50), primary_key=True, index=True)  # e.g. 'REQ-FAC-01'
+    title = Column(String(250), nullable=False)
+    description = Column(Text, nullable=False)
+    category_code = Column(String(50), nullable=True)  # Informational reference to complaint_categories.code
+    regulatory_source = Column(String(250), nullable=False)
+    source_reference_url = Column(String(500), nullable=True)
+    applicable_institution_types = Column(JSON, nullable=False)  # e.g. ["Engineering & Technology", "Management"] or ["ALL"]
+    applicability_conditions = Column(JSON, nullable=True)
+    weight = Column(Float, default=1.0)
+    default_evidence_requirements = Column(JSON, nullable=True)
+    responsible_bureau_id = Column(Integer, ForeignKey("bureaus.id"), nullable=False, index=True)
+    effective_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    review_date = Column(DateTime, nullable=True)
+    version = Column(Integer, default=1)
+    is_active = Column(Boolean, default=True, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    responsible_bureau = relationship("Bureau", foreign_keys=[responsible_bureau_id])
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    versions = relationship("RegulatoryRequirementVersion", back_populates="requirement", cascade="all, delete-orphan")
+    assessments = relationship("ComplianceAssessment", back_populates="requirement")
+
+class RegulatoryRequirementVersion(Base):
+    __tablename__ = "regulatory_requirement_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requirement_id = Column(String(50), ForeignKey("regulatory_requirements.id"), nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    title = Column(String(250), nullable=False)
+    description = Column(Text, nullable=False)
+    weight = Column(Float, nullable=False, default=1.0)
+    regulatory_source = Column(String(250), nullable=False)
+    changes_summary = Column(Text, nullable=False)
+    promulgated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False, index=True)
+
+    # Relationships
+    requirement = relationship("RegulatoryRequirement", back_populates="versions")
+    promulgated_by = relationship("User", foreign_keys=[promulgated_by_id])
+
+class ComplianceAssessment(Base):
+    __tablename__ = "compliance_assessments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False, index=True)
+    requirement_id = Column(String(50), ForeignKey("regulatory_requirements.id"), nullable=False, index=True)
+    requirement_version = Column(Integer, default=1)
+    assessment_period = Column(String(50), nullable=False, index=True)  # e.g. 'AY-2025-26'
+    status = Column(String(50), default="NOT_ASSESSED", index=True)  # 'NOT_ASSESSED', 'PENDING_EVIDENCE', 'UNDER_REVIEW', 'COMPLIANT', 'PARTIALLY_COMPLIANT', 'NON_COMPLIANT', 'NOT_APPLICABLE'
+    score_contribution = Column(Float, nullable=True)  # 1.0, 0.5, 0.0, or Null
+    reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewer_remarks = Column(Text, nullable=True)
+    assessed_at = Column(DateTime, nullable=True)
+    decision_history = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    institution = relationship("Institution", back_populates="compliance_assessments")
+    requirement = relationship("RegulatoryRequirement", back_populates="assessments")
+    reviewer = relationship("User", foreign_keys=[reviewer_id])
+    evidences = relationship("ComplianceEvidence", back_populates="assessment", cascade="all, delete-orphan")
+    caps = relationship("CorrectiveActionPlan", back_populates="assessment")
+
+class ComplianceEvidence(Base):
+    __tablename__ = "compliance_evidences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    assessment_id = Column(Integer, ForeignKey("compliance_assessments.id"), nullable=False, index=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False, index=True)
+    document_id = Column(Integer, ForeignKey("document_metadata.id"), nullable=False, index=True)
+    evidence_type = Column(String(100), nullable=False)  # 'Inspection Report', 'Audited Financial Statement', 'Biometric Cadre Register', 'Affidavit', 'Official Notice'
+    verification_status = Column(String(50), default="SUBMITTED", index=True)  # 'SUBMITTED', 'VERIFIED', 'REJECTED', 'CLARIFICATION_REQUESTED'
+    verified_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    verification_remarks = Column(Text, nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    submitted_by_role = Column(String(50), default="officer")  # 'officer', 'institution_admin'
+    submitted_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+    verified_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    assessment = relationship("ComplianceAssessment", back_populates="evidences")
+    institution = relationship("Institution", foreign_keys=[institution_id])
+    document = relationship("DocumentMetadata", foreign_keys=[document_id])
+    verified_by = relationship("User", foreign_keys=[verified_by_id])
+    submitted_by = relationship("User", foreign_keys=[submitted_by_id])
+
+class CorrectiveActionPlan(Base):
+    __tablename__ = "corrective_action_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False, index=True)
+    assessment_id = Column(Integer, ForeignKey("compliance_assessments.id"), nullable=True, index=True)
+    related_case_id = Column(String(100), ForeignKey("cases.id"), nullable=True, index=True)
+    title = Column(String(250), nullable=False)
+    identified_gap = Column(Text, nullable=False)
+    required_action = Column(Text, nullable=False)
+    responsible_bureau_id = Column(Integer, ForeignKey("bureaus.id"), nullable=False)
+    assigned_officer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    priority = Column(String(50), default="Medium")  # 'Critical', 'High', 'Medium', 'Low'
+    status = Column(String(50), default="PROPOSED", index=True)
+    # 'PROPOSED', 'ASSIGNED', 'IN_PROGRESS', 'EVIDENCE_SUBMITTED', 'UNDER_REVIEW', 'VERIFIED', 'CLOSED', 'REJECTED', 'OVERDUE', 'REOPENED', 'CANCELLED'
+    prescribed_deadline = Column(DateTime, nullable=False, index=True)
+    completion_evidence_doc_id = Column(Integer, ForeignKey("document_metadata.id"), nullable=True)
+    verification_officer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    verification_remarks = Column(Text, nullable=True)
+    closure_decision = Column(Text, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    reopen_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    institution = relationship("Institution", back_populates="corrective_actions")
+    assessment = relationship("ComplianceAssessment", back_populates="caps")
+    related_case = relationship("Case", foreign_keys=[related_case_id])
+    responsible_bureau = relationship("Bureau", foreign_keys=[responsible_bureau_id])
+    assigned_officer = relationship("User", foreign_keys=[assigned_officer_id])
+    verification_officer = relationship("User", foreign_keys=[verification_officer_id])
+    completion_evidence_document = relationship("DocumentMetadata", foreign_keys=[completion_evidence_doc_id])
+
+class InstitutionalRiskIndicator(Base):
+    __tablename__ = "institutional_risk_indicators"
+
+    id = Column(Integer, primary_key=True, index=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False, index=True)
+    indicator_type = Column(String(100), nullable=False, index=True)  # 'IND-GAP-CHRONIC', 'IND-CAP-OVERDUE', 'IND-SLA-FAIL', 'IND-SURGE-SPIKE', 'IND-CONFLICT-STALE', 'IND-CAT-HOTSPOT'
+    severity = Column(String(50), default="MODERATE", index=True)  # 'LOW', 'MODERATE', 'HIGH', 'CRITICAL'
+    title = Column(String(250), nullable=False)
+    supporting_evidence = Column(JSON, nullable=False)
+    observation_period = Column(String(100), nullable=False)
+    calculation_method = Column(String(100), nullable=False)
+    data_completeness = Column(Float, default=1.0)
+    recommended_review = Column(Text, nullable=False)
+    status = Column(String(50), default="ACTIVE", index=True)  # 'ACTIVE', 'REVIEWED', 'DISMISSED', 'RESOLVED'
+    detected_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    institution = relationship("Institution", back_populates="risk_indicators")
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
+
+class ComplianceScoreSnapshot(Base):
+    __tablename__ = "compliance_score_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=False, index=True)
+    assessment_period = Column(String(50), nullable=False, index=True)
+    compliance_percentage = Column(Float, nullable=False)
+    assessment_coverage_pct = Column(Float, nullable=False)
+    total_applicable_requirements = Column(Integer, nullable=False)
+    verified_compliant_count = Column(Integer, nullable=False)
+    partially_compliant_count = Column(Integer, nullable=False)
+    non_compliant_count = Column(Integer, nullable=False)
+    unassessed_count = Column(Integer, nullable=False)
+    pending_evidence_count = Column(Integer, nullable=False)
+    risk_tier = Column(String(50), nullable=False)  # 'LOW_RISK', 'MODERATE_RISK', 'HIGH_RISK', 'CRITICAL_RISK'
+    calculation_version = Column(String(50), default="v1.0.0")
+    formula_breakdown = Column(JSON, nullable=False)
+    calculated_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    institution = relationship("Institution", back_populates="compliance_snapshots")
+
 

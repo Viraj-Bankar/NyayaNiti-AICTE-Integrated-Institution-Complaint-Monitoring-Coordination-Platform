@@ -7,12 +7,15 @@ from app.api import (
     coordination, dashboard, surges, reports, notifications,
     audit, documents, settings as admin_settings,
     complainant_auth, complainant_cases, officer_complaints,
-    ai_duplicates
+    ai_duplicates, compliance
 )
 from app.seed_data import seed_database
 
-# Ensure database tables and schema columns
-ensure_schema()
+from app.services.storage_service import validate_storage_on_startup
+
+# Ensure database tables and schema columns if auto-migration is enabled
+if settings.AUTO_MIGRATE:
+    ensure_schema()
 
 app = FastAPI(
     title="NyayaNiti — AICTE Integrated Institution Complaint Monitoring & Coordination Platform",
@@ -32,15 +35,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Startup event to ensure schema migrations and seed database if empty
+# Startup event to ensure persistent storage, schema migrations, and seed database if empty
 @app.on_event("startup")
 def on_startup():
-    ensure_schema()
-    db = SessionLocal()
-    try:
-        seed_database(db)
-    finally:
-        db.close()
+    validate_storage_on_startup()
+    if settings.AUTO_MIGRATE:
+        ensure_schema()
+    
+    # Auto-seeding is strictly reserved for local development environments
+    if settings.AUTO_SEED and os.getenv("APP_ENV", "development").lower() not in ("staging", "production"):
+        db = SessionLocal()
+        try:
+            seed_database(db)
+        finally:
+            db.close()
 
 # Include routers - Internal Operational & Officer
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
@@ -58,6 +66,7 @@ app.include_router(documents.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin_settings.router, prefix=settings.API_V1_PREFIX)
 app.include_router(officer_complaints.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai_duplicates.router, prefix=settings.API_V1_PREFIX)
+app.include_router(compliance.router, prefix=settings.API_V1_PREFIX)
 
 # Include routers - Citizen & Complainant Space
 app.include_router(complainant_auth.router, prefix=settings.API_V1_PREFIX)

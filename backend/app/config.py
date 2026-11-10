@@ -40,6 +40,24 @@ class Settings(BaseSettings):
     SLA_MEDIUM_DAYS: int = 30
     SLA_LOW_DAYS: int = 45
 
+    # Document & Evidence Storage Configuration (Zero-Cost Neon PostgreSQL BYTEA Compatible)
+    DOCUMENT_STORAGE_BACKEND: str = "neon_bytea"
+    DOCUMENT_STORAGE_ROOT: str = "./storage/docs"
+    DOCUMENT_STORAGE_MAX_FILE_SIZE_MB: int = 3
+    DOCUMENT_STORAGE_ALLOWED_EXTENSIONS: List[str] = [
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".docx",
+    ]
+    # Assumed / configured storage quota threshold for zero-cost Neon tier (unverified estimate, not an empirical quota fact)
+    DOCUMENT_STORAGE_ASSUMED_QUOTA_MB: int = 512
+
+    # Database Migration and Seeding Controls
+    AUTO_MIGRATE: bool = True
+    AUTO_SEED: bool = True
+
     model_config = SettingsConfigDict(
         env_file=(
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
@@ -53,8 +71,13 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-if os.getenv("APP_ENV", "development").lower() == "production":
-    if not settings.SECRET_KEY or len(settings.SECRET_KEY) < 32:
+env_mode = os.getenv("APP_ENV", "development").lower()
+if env_mode in ("production", "staging"):
+    if not settings.SECRET_KEY or len(settings.SECRET_KEY) < 32 or "fallback" in settings.SECRET_KEY.lower():
         raise RuntimeError(
-            "Production requires a strong SECRET_KEY of at least 32 characters."
+            f"{env_mode.capitalize()} requires an explicit, strong SECRET_KEY of at least 32 characters. Cannot use default development fallback key."
+        )
+    if "sqlite" in settings.DATABASE_URL.lower() and "nyayaniti.db" in settings.DATABASE_URL.lower():
+        raise RuntimeError(
+            f"{env_mode.capitalize()} cannot execute against local development database 'nyayaniti.db'. Explicit remote/staging DATABASE_URL is required."
         )

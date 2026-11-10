@@ -33,12 +33,11 @@ router = APIRouter(prefix="/complainant/cases", tags=["Complainant Cases (Legacy
 notification_router = APIRouter(prefix="/complainant/notifications", tags=["Complainant Notifications"])
 citizen_directory_router = APIRouter(prefix="/complainant", tags=["Complainant Directory"])
 
-# Storage configuration (Supports Render Persistent Disk via STORAGE_DIR env var)
-DEFAULT_STORAGE_DIR = os.path.abspath(os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "storage", "cases"
-))
-BASE_STORAGE_DIR = os.path.abspath(os.environ.get("STORAGE_DIR", DEFAULT_STORAGE_DIR))
+# Storage configuration (Supports Render Persistent Disk via centralized storage service)
+from app.services import storage_service
+
+DEFAULT_STORAGE_DIR = storage_service.get_storage_root()
+BASE_STORAGE_DIR = storage_service.get_storage_root()
 os.makedirs(BASE_STORAGE_DIR, exist_ok=True)
 
 # Whitelist of canonical complaint categories
@@ -657,97 +656,64 @@ async def _upload_complainant_document(
             detail="Complaint record not found or access unauthorized."
         )
 
-    # 2. File extension check
-    original_name = file.filename or "evidence.pdf"
-    clean_original_name = os.path.basename(original_name)
-    ext = clean_original_name.split(".")[-1].lower() if "." in clean_original_name else ""
-
-    if ext not in ALLOWED_EXTENSIONS:
+    # 2. Read contents with real-time stream size enforcement
+    try:
+        contents = await storage_service.read_upload_stream(file)
+    except ValueError as ve:
+        if "exceeds maximum permitted limit" in str(ve).lower():
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=str(ve)
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file format '.{ext}'. Allowed formats: PDF, PNG, JPG, JPEG, DOCX."
+            detail=str(ve)
         )
 
-    # 3. MIME type check
-    content_type = (file.content_type or "").lower()
-    if content_type and content_type not in ALLOWED_MIME_TYPES:
+    # 3. Comprehensive upload validation and unified transactional storage (BYTEA or Filesystem)
+    try:
+        doc = storage_service.store_uploaded_document(
+            db=db,
+            case_id=case.id,
+            file_data=contents,
+            original_filename=file.filename or "evidence.pdf",
+            category=category,
+            access_classification="Public",
+            uploaded_by_id=None,
+            uploaded_by_complainant_id=current_complainant.id,
+            uploader_role="complainant",
+            content_type=file.content_type
+        )
+    except ValueError as ve:
+        if "exceeds maximum permitted limit" in str(ve).lower():
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=str(ve)
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Disallowed MIME type '{content_type}'."
+            detail=str(ve)
         )
 
-    # 4. File size check
-    contents = await file.read()
-    file_size = len(contents)
-
-    if file_size > MAX_FILE_SIZE_BYTES:
+    try:
+        db.commit()
+        db.refresh(doc)
+    except Exception:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File size exceeds maximum permitted limit of {MAX_FILE_SIZE_BYTES // (1024 * 1024)} MB."
+            status_code=500,
+            detail="Database transaction failed during document upload."
         )
-    if file_size == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file is empty."
-        )
-
-    # 5. Magic bytes inspection
-    if not validate_file_content(contents, ext):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File content does not match the stated file extension format."
-        )
-
-    # 6. Safe server-side filename & Path traversal defense
-    storage_dir = os.path.abspath(os.path.join(BASE_STORAGE_DIR, case.id))
-    if not storage_dir.startswith(BASE_STORAGE_DIR):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Path traversal attempt detected."
-        )
-    os.makedirs(storage_dir, exist_ok=True)
-
-    uid = uuid.uuid4().hex[:12]
-    safe_stored_name = f"doc_{uid}.{ext}"
-    stored_path = os.path.abspath(os.path.join(storage_dir, safe_stored_name))
-
-    if not stored_path.startswith(storage_dir):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Path traversal attempt detected."
-        )
-
-    # 7. Write to isolated storage
-    with open(stored_path, "wb") as f:
-        f.write(contents)
-
-    # 8. Record Document Metadata (Virtual file path exposed, physical path hidden)
-    doc = DocumentMetadata(
-        case_id=case.id,
-        file_name=safe_stored_name,
-        original_filename=clean_original_name,
-        file_size=file_size,
-        file_type=ext,
-        category=category,
-        access_classification="Public",
-        uploaded_by_id=None,
-        uploaded_by_complainant_id=current_complainant.id,
-        uploader_role="complainant",
-        file_path=f"/api/complainant/complaints/{case.id}/documents/{safe_stored_name}/download",
-        upload_timestamp=datetime.utcnow()
-    )
-    db.add(doc)
-    db.commit()
-    db.refresh(doc)
 
     # 9. Case event & audit log
+    evidence_name = doc.original_filename or doc.file_name
     record_case_event(
         db=db,
         case_id=case.id,
         event_type="DOCUMENT_ATTACHED",
         actor_id=None,
         actor_name=current_complainant.full_name,
-        remarks=f"Complainant attached supporting evidence '{clean_original_name}' ({category})",
+        remarks=f"Complainant attached supporting evidence '{evidence_name}' ({category})",
         document_ref=doc.file_name
     )
 
@@ -759,7 +725,7 @@ async def _upload_complainant_document(
         event_type="DOCUMENT_UPLOAD",
         entity_type="DocumentMetadata",
         entity_id=str(doc.id),
-        remarks=f"Citizen uploaded evidence {clean_original_name} for complaint {case.id}"
+        remarks=f"Citizen uploaded evidence {evidence_name} for complaint {case.id}"
     )
 
     return doc
@@ -863,27 +829,12 @@ def download_complaint_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Requested document not found or access unauthorized.")
 
-    storage_dir = os.path.abspath(os.path.join(BASE_STORAGE_DIR, case.id))
-    physical_path = os.path.abspath(os.path.join(storage_dir, doc.file_name))
+    payload = storage_service.retrieve_document_payload(doc, db)
 
-    if not physical_path.startswith(storage_dir) or not os.path.isfile(physical_path):
+    if not payload:
         raise HTTPException(status_code=404, detail="Stored document file could not be retrieved.")
 
-    media_type = "application/octet-stream"
-    if doc.file_type == "pdf":
-        media_type = "application/pdf"
-    elif doc.file_type in ("png", "jpg", "jpeg"):
-        media_type = f"image/{doc.file_type}"
-
-    return FileResponse(
-        path=physical_path,
-        media_type=media_type,
-        filename=doc.original_filename or doc.file_name,
-        headers={
-            "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": f'attachment; filename="{doc.original_filename or doc.file_name}"'
-        }
-    )
+    return storage_service.create_download_response(payload)
 
 
 # -------------------------------------------------------------------------

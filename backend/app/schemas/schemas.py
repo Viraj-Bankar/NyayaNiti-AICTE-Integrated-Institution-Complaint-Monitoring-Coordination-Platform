@@ -797,5 +797,275 @@ class AIModelStatusResponse(BaseModel):
     pgvector_note: str
     statutory_safeguard: str
 
+# =========================================================================
+# PHASE 8: AUTOMATED INSTITUTIONAL COMPLIANCE & REGULATORY ANALYTICS SCHEMAS
+# =========================================================================
+
+class RegulatoryRequirementVersionResponse(BaseModel):
+    id: int
+    requirement_id: str
+    version_number: int
+    title: str
+    description: str
+    weight: float
+    regulatory_source: str
+    changes_summary: str
+    promulgated_by_id: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class RegulatoryRequirementCreate(BaseModel):
+    id: str = Field(..., description="Unique Requirement Identifier, e.g. REQ-FAC-01")
+    title: str = Field(..., min_length=3, max_length=250)
+    description: str = Field(..., min_length=10)
+    category_code: Optional[str] = None
+    regulatory_source: str = Field(..., description="Authoritative reference, e.g. AICTE APH 2024-27 Clause 7.12")
+    source_reference_url: Optional[str] = None
+    applicable_institution_types: List[str] = Field(default=["ALL"])
+    applicability_conditions: Optional[Dict[str, Any]] = None
+    weight: float = Field(default=1.0, ge=0.1, le=10.0)
+    default_evidence_requirements: Optional[List[str]] = None
+    responsible_bureau_id: int
+    effective_date: Optional[datetime] = None
+    review_date: Optional[datetime] = None
+
+class RegulatoryRequirementUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category_code: Optional[str] = None
+    regulatory_source: Optional[str] = None
+    source_reference_url: Optional[str] = None
+    applicable_institution_types: Optional[List[str]] = None
+    applicability_conditions: Optional[Dict[str, Any]] = None
+    weight: Optional[float] = None
+    default_evidence_requirements: Optional[List[str]] = None
+    responsible_bureau_id: Optional[int] = None
+    review_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
+    changes_summary: Optional[str] = Field(None, description="Summary of changes prompting new version creation")
+
+class RegulatoryRequirementResponse(BaseModel):
+    id: str
+    title: str
+    description: str
+    category_code: Optional[str] = None
+    regulatory_source: str
+    source_reference_url: Optional[str] = None
+    applicable_institution_types: List[str]
+    applicability_conditions: Optional[Dict[str, Any]] = None
+    weight: float
+    default_evidence_requirements: Optional[List[str]] = None
+    responsible_bureau_id: int
+    responsible_bureau_code: Optional[str] = None
+    effective_date: datetime
+    review_date: Optional[datetime] = None
+    version: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    versions: Optional[List[RegulatoryRequirementVersionResponse]] = None
+
+    class Config:
+        from_attributes = True
+
+class ComplianceEvidenceCreate(BaseModel):
+    document_id: int
+    evidence_type: str = Field(..., description="e.g. Inspection Report, Biometric Cadre Register, Affidavit")
+    remarks: Optional[str] = None
+
+class ComplianceEvidenceReviewRequest(BaseModel):
+    status: Optional[str] = None
+    verification_status: Optional[str] = None
+    verification_remarks: str = Field(..., min_length=3)
+    rejection_reason: Optional[str] = None
+
+class ComplianceEvidenceResponse(BaseModel):
+    id: int
+    assessment_id: int
+    institution_id: int
+    document_id: int
+    document_name: Optional[str] = None
+    file_type: Optional[str] = None
+    evidence_type: str
+    verification_status: str
+    verified_by_id: Optional[int] = None
+    verified_by_name: Optional[str] = None
+    verification_remarks: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    submitted_by_role: str
+    submitted_at: datetime
+    verified_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class ComplianceAssessmentCreate(BaseModel):
+    institution_id: int
+    requirement_id: str
+    assessment_period: str = Field("AY-2025-26", description="Academic Year or Assessment Period")
+    status: Optional[str] = "NOT_ASSESSED"
+
+class ComplianceAssessmentReviewRequest(BaseModel):
+    status: str = Field(..., description="COMPLIANT, PARTIALLY_COMPLIANT, NON_COMPLIANT, PENDING_EVIDENCE, UNDER_REVIEW, NOT_APPLICABLE")
+    reviewer_remarks: str = Field(..., min_length=5)
+    score_contribution: Optional[float] = None
+
+class ComplianceAssessmentResponse(BaseModel):
+    id: int
+    institution_id: int
+    institution_name: Optional[str] = None
+    requirement_id: str
+    requirement_title: Optional[str] = None
+    requirement_weight: Optional[float] = 1.0
+    requirement_version: int
+    assessment_period: str
+    status: str
+    score_contribution: Optional[float] = None
+    reviewer_id: Optional[int] = None
+    reviewer_name: Optional[str] = None
+    reviewer_remarks: Optional[str] = None
+    assessed_at: Optional[datetime] = None
+    decision_history: Optional[List[Dict[str, Any]]] = None
+    created_at: datetime
+    updated_at: datetime
+    evidences: Optional[List[ComplianceEvidenceResponse]] = None
+
+    class Config:
+        from_attributes = True
+
+class CAPCreate(BaseModel):
+    institution_id: int
+    assessment_id: Optional[int] = None
+    related_case_id: Optional[str] = None
+    title: str = Field(..., min_length=5, max_length=250)
+    identified_gap: str = Field(..., min_length=10)
+    required_action: str = Field(..., min_length=10)
+    responsible_bureau_id: int
+    assigned_officer_id: int
+    priority: str = Field("Medium", description="Critical, High, Medium, Low")
+    prescribed_deadline: datetime
+
+class CAPUpdate(BaseModel):
+    title: Optional[str] = None
+    required_action: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    remarks: Optional[str] = None
+
+class CAPEvidenceSubmit(BaseModel):
+    completion_evidence_doc_id: int
+    remarks: str = Field(..., min_length=5)
+
+class CAPVerifyRequest(BaseModel):
+    verification_remarks: str = Field(..., min_length=5)
+    closure_decision: str = Field(..., min_length=5)
+
+class CAPReopenRequest(BaseModel):
+    reopen_reason: str = Field(..., min_length=10)
+
+class CAPResponse(BaseModel):
+    id: int
+    institution_id: int
+    institution_name: Optional[str] = None
+    assessment_id: Optional[int] = None
+    related_case_id: Optional[str] = None
+    title: str
+    identified_gap: str
+    required_action: str
+    responsible_bureau_id: int
+    responsible_bureau_code: Optional[str] = None
+    assigned_officer_id: int
+    assigned_officer_name: Optional[str] = None
+    priority: str
+    status: str
+    prescribed_deadline: datetime
+    completion_evidence_doc_id: Optional[int] = None
+    verification_officer_id: Optional[int] = None
+    verification_officer_name: Optional[str] = None
+    verification_remarks: Optional[str] = None
+    closure_decision: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    reopen_reason: Optional[str] = None
+    is_overdue: bool = False
+    days_remaining: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class InstitutionalRiskIndicatorResponse(BaseModel):
+    id: int
+    institution_id: int
+    institution_name: Optional[str] = None
+    indicator_type: str
+    severity: str
+    title: str
+    supporting_evidence: Dict[str, Any]
+    observation_period: str
+    calculation_method: str
+    data_completeness: float
+    recommended_review: str
+    status: str
+    detected_at: datetime
+    reviewed_by_id: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class InstitutionScorecardResponse(BaseModel):
+    institution_id: int
+    institution_name: str
+    permanent_id: str
+    region: str
+    state: str
+    assessment_period: str
+    compliance_percentage: float
+    assessment_coverage_pct: float
+    is_provisional: bool
+    risk_tier: str
+    total_applicable_requirements: int
+    verified_compliant_count: int
+    partially_compliant_count: int
+    non_compliant_count: int
+    unassessed_count: int
+    pending_evidence_count: int
+    not_applicable_count: int
+    active_cap_count: int
+    overdue_cap_count: int
+    active_risk_indicator_count: int
+    calculated_at: datetime
+    formula_breakdown: Optional[Dict[str, Any]] = None
+
+class ExecutiveGovernanceResponse(BaseModel):
+    total_institutions_monitored: int
+    active_regulatory_requirements: int
+    national_average_compliance_pct: float
+    national_average_coverage_pct: float
+    institutions_high_or_critical_risk: int
+    total_active_caps: int
+    total_overdue_caps: int
+    national_grievance_sla_adherence_pct: float
+    regional_summaries: List[Dict[str, Any]]
+    top_deficiencies: List[Dict[str, Any]]
+    risk_distribution: Dict[str, int]
+    evaluated_at: datetime
+
+class GrievancePerformanceResponse(BaseModel):
+    total_complaints: int
+    resolved_complaints: int
+    pending_complaints: int
+    overdue_complaints: int
+    sla_adherence_pct: float
+    disposal_rate_pct: float
+    average_resolution_days: float
+    overdue_rate_pct: float
+    category_breakdown: List[Dict[str, Any]]
+    observation_period: str
+
+
 
 

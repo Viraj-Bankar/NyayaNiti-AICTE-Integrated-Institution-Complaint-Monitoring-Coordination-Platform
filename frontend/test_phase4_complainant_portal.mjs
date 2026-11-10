@@ -121,7 +121,7 @@ assert(submitContent.includes('isDeclared'), 'Submission form enforces statutory
 assert(submitContent.includes('api.getComplainantInstitutions'), 'Fetches institutions from real backend');
 assert(submitContent.includes('api.getComplainantCategories'), 'Fetches categories from real backend');
 assert(submitContent.includes('fieldErrors'), 'Provides clear field validation');
-assert(submitContent.includes('5 MB'), 'Displays upload restrictions (5 MB)');
+assert(submitContent.includes('3 MB'), 'Displays upload restrictions (3 MB)');
 assert(submitContent.includes('isSubmitting'), 'Prevents accidental multiple submissions');
 assert(submitContent.includes('submittedCase'), 'Renders Success Screen only after backend confirmation');
 assert(submitContent.includes('submittedCase.id'), 'Success screen displays unique complaint reference number');

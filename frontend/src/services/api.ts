@@ -10,7 +10,14 @@ import {
   OfficerComplaintRequestInfoPayload, OfficerComplaintAssignPayload, OfficerComplaintLinkPayload,
   OfficerComplaintResolvePayload, OfficerComplaintClosePayload,
   AIDuplicateCandidate, AIDuplicateAnalysis, AIDuplicateDetail,
-  OfficerDuplicateVerifyPayload, OfficerDuplicateVerifyResponse, AIModelStatus
+  OfficerDuplicateVerifyPayload, OfficerDuplicateVerifyResponse, AIModelStatus,
+  RegulatoryRequirement, RegulatoryRequirementCreatePayload,
+  RegulatoryRequirementUpdatePayload, ComplianceAssessment, ComplianceAssessmentCreatePayload,
+  ComplianceAssessmentReviewPayload, ComplianceEvidence, ComplianceEvidenceCreatePayload,
+  ComplianceEvidenceReviewPayload, CorrectiveActionPlan, CAPCreatePayload,
+  CAPUpdatePayload, CAPEvidenceSubmitPayload, CAPVerifyPayload, CAPReopenPayload,
+  InstitutionalRiskIndicator, InstitutionScorecard, ExecutiveGovernanceSummary,
+  GrievancePerformance
 } from '../types';
 
 /**
@@ -1101,7 +1108,263 @@ export const api = {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
+  },
+
+  // ---------------------------------------------------------------------------
+  // Phase 8: Automated Institutional Compliance & Regulatory Analytics APIs
+  // ---------------------------------------------------------------------------
+
+  async listRegulatoryRequirements(params?: {
+    institution_type?: string;
+    bureau_id?: number;
+    is_active?: boolean;
+  }): Promise<RegulatoryRequirement[]> {
+    const url = buildApiUrl('/compliance/requirements', params);
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse(res);
+  },
+
+  async getRegulatoryRequirement(id: string): Promise<RegulatoryRequirement> {
+    const res = await fetch(`${API_BASE}/compliance/requirements/${id}`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async createRegulatoryRequirement(payload: RegulatoryRequirementCreatePayload): Promise<RegulatoryRequirement> {
+    const res = await fetch(`${API_BASE}/compliance/requirements`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async updateRegulatoryRequirement(id: string, payload: RegulatoryRequirementUpdatePayload): Promise<RegulatoryRequirement> {
+    const res = await fetch(`${API_BASE}/compliance/requirements/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async listComplianceAssessments(params?: {
+    institution_id?: number;
+    assessment_period?: string;
+    status?: string;
+  }): Promise<ComplianceAssessment[]> {
+    const url = buildApiUrl('/compliance/assessments', params);
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse(res);
+  },
+
+  async getComplianceAssessment(id: number): Promise<ComplianceAssessment> {
+    const res = await fetch(`${API_BASE}/compliance/assessments/${id}`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async createComplianceAssessment(payload: ComplianceAssessmentCreatePayload): Promise<ComplianceAssessment> {
+    const res = await fetch(`${API_BASE}/compliance/assessments`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async reviewComplianceAssessment(id: number, payload: ComplianceAssessmentReviewPayload): Promise<ComplianceAssessment> {
+    const res = await fetch(`${API_BASE}/compliance/assessments/${id}/review`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async attachAssessmentEvidence(assessmentId: number, payload: ComplianceEvidenceCreatePayload): Promise<ComplianceEvidence> {
+    const res = await fetch(`${API_BASE}/compliance/assessments/${assessmentId}/evidence`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async listComplianceEvidence(params?: {
+    institution_id?: number;
+    assessment_id?: number;
+    verification_status?: string;
+  }): Promise<ComplianceEvidence[]> {
+    const url = buildApiUrl('/compliance/evidence', params);
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse(res);
+  },
+
+  async reviewComplianceEvidence(id: number, payload: ComplianceEvidenceReviewPayload): Promise<ComplianceEvidence> {
+    const res = await fetch(`${API_BASE}/compliance/evidence/${id}/review`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async listCorrectiveActionPlans(params?: {
+    institution_id?: number;
+    status?: string;
+    assigned_officer_id?: number;
+    bureau_id?: number;
+  }): Promise<CorrectiveActionPlan[]> {
+    const url = buildApiUrl('/compliance/caps', params);
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse(res);
+  },
+
+  async getCorrectiveActionPlan(id: number): Promise<CorrectiveActionPlan> {
+    const res = await fetch(`${API_BASE}/compliance/caps/${id}`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async createCorrectiveActionPlan(payload: CAPCreatePayload): Promise<CorrectiveActionPlan> {
+    const res = await fetch(`${API_BASE}/compliance/caps`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async updateCorrectiveActionPlan(id: number, payload: CAPUpdatePayload): Promise<CorrectiveActionPlan> {
+    const res = await fetch(`${API_BASE}/compliance/caps/${id}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async submitCAPEvidence(id: number, payload: CAPEvidenceSubmitPayload): Promise<CorrectiveActionPlan> {
+    const res = await fetch(`${API_BASE}/compliance/caps/${id}/submit-evidence`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async verifyCAP(id: number, payload: CAPVerifyPayload): Promise<CorrectiveActionPlan> {
+    const res = await fetch(`${API_BASE}/compliance/caps/${id}/verify`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async reopenCAP(id: number, payload: CAPReopenPayload): Promise<CorrectiveActionPlan> {
+    const res = await fetch(`${API_BASE}/compliance/caps/${id}/reopen`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async scanOverdueCAPs(): Promise<{ status: string; scanned_count?: number; updated_to_overdue?: number }> {
+    const res = await fetch(`${API_BASE}/compliance/caps/scan-overdue`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getInstitutionScorecard(institutionId: number, assessmentPeriod: string = 'AY-2025-26'): Promise<InstitutionScorecard> {
+    const url = buildApiUrl(`/compliance/institutions/${institutionId}/scorecard`, {
+      assessment_period: assessmentPeriod
+    });
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse(res);
+  },
+
+  async getInstitutionRiskIndicators(institutionId: number): Promise<InstitutionalRiskIndicator[]> {
+    const res = await fetch(`${API_BASE}/compliance/institutions/${institutionId}/risk`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getInstitutionGrievancePerformance(institutionId: number, observationDays: number = 90): Promise<GrievancePerformance> {
+    const url = buildApiUrl(`/compliance/institutions/${institutionId}/grievance-performance`, {
+      observation_days: observationDays
+    });
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    return handleResponse(res);
+  },
+
+  async getExecutiveGovernanceDashboard(): Promise<ExecutiveGovernanceSummary> {
+    const res = await fetch(`${API_BASE}/compliance/analytics/executive`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async downloadComplianceRegistryCSV(): Promise<void> {
+    const token = localStorage.getItem('nyayaniti_token');
+    const res = await fetch(`${API_BASE}/compliance/reports/export`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+      let errText = `Failed to export compliance registry: HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        errText = errJson.detail || errText;
+      } catch {
+        // fallback
+      }
+      throw new Error(errText);
+    }
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `nyayaniti_compliance_registry_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   }
+};
+
+export const complianceApi = {
+  listRequirements: api.listRegulatoryRequirements,
+  getRequirement: api.getRegulatoryRequirement,
+  createRequirement: api.createRegulatoryRequirement,
+  updateRequirement: api.updateRegulatoryRequirement,
+  listAssessments: api.listComplianceAssessments,
+  getAssessment: api.getComplianceAssessment,
+  createAssessment: api.createComplianceAssessment,
+  reviewAssessment: api.reviewComplianceAssessment,
+  attachEvidence: api.attachAssessmentEvidence,
+  listEvidence: api.listComplianceEvidence,
+  reviewEvidence: api.reviewComplianceEvidence,
+  listCAPs: api.listCorrectiveActionPlans,
+  getCAP: api.getCorrectiveActionPlan,
+  createCAP: api.createCorrectiveActionPlan,
+  updateCAP: api.updateCorrectiveActionPlan,
+  submitCAPEvidence: api.submitCAPEvidence,
+  verifyCAP: api.verifyCAP,
+  reopenCAP: api.reopenCAP,
+  scanOverdueCAPs: api.scanOverdueCAPs,
+  getScorecard: api.getInstitutionScorecard,
+  getRiskIndicators: api.getInstitutionRiskIndicators,
+  getGrievancePerformance: api.getInstitutionGrievancePerformance,
+  getExecutiveDashboard: api.getExecutiveGovernanceDashboard,
+  downloadRegistryCSV: api.downloadComplianceRegistryCSV
 };
 
 export const aiDuplicatesApi = {

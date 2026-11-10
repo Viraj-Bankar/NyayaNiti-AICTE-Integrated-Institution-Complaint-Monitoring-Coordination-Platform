@@ -78,11 +78,11 @@ export const ComplaintSubmissionPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (max 5 MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Validate size (max 3 MB)
+    if (file.size > 3 * 1024 * 1024) {
       setFieldErrors(prev => ({
         ...prev,
-        file: 'File size exceeds maximum permitted limit of 5 MB.'
+        file: 'File size exceeds maximum permitted limit of 3 MB.'
       }));
       return;
     }
@@ -483,7 +483,7 @@ export const ComplaintSubmissionPage: React.FC = () => {
                     <Paperclip className="w-4 h-4 text-[#1E5AA8]" />
                     <span>Upload Supporting Evidentiary Document (Optional)</span>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-500">Max 5 MB</span>
+                  <span className="text-[10px] font-bold text-slate-500">Max 3 MB</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

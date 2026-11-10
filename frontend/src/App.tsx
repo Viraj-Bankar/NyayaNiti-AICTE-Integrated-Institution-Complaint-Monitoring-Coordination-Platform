@@ -35,6 +35,18 @@ import { ComplaintDetailPage } from './pages/ComplaintDetailPage';
 import { OfficerComplaintInboxPage } from './pages/OfficerComplaintInboxPage';
 import { OfficerComplaintReviewPage } from './pages/OfficerComplaintReviewPage';
 
+// Phase 8 Institutional Compliance & Regulatory Analytics Pages
+import { ComplianceDashboardPage } from './pages/ComplianceDashboardPage';
+import { RegulatoryRequirementsPage } from './pages/RegulatoryRequirementsPage';
+import { InstitutionComplianceProfilePage } from './pages/InstitutionComplianceProfilePage';
+import { ComplianceAssessmentWorkspacePage } from './pages/ComplianceAssessmentWorkspacePage';
+import { EvidenceReviewPage } from './pages/EvidenceReviewPage';
+import { CorrectiveActionPlansPage } from './pages/CorrectiveActionPlansPage';
+import { InstitutionalRiskIntelligencePage } from './pages/InstitutionalRiskIntelligencePage';
+import { SlaAnalyticsPage } from './pages/SlaAnalyticsPage';
+import { ExecutiveGovernancePage } from './pages/ExecutiveGovernancePage';
+import { GovernanceReportsPage } from './pages/GovernanceReportsPage';
+
 /**
  * RootRoute:
  * - Unauthenticated visitors: See ONLY the comprehensive public Explore page.
@@ -300,6 +312,112 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['super_admin']}>
                     <AdminSettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Phase 8 Institutional Compliance & Regulatory Analytics Routes */}
+              <Route
+                path="/compliance"
+                element={
+                  <ProtectedRoute>
+                    <ComplianceDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <ComplianceDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/requirements"
+                element={
+                  <ProtectedRoute>
+                    <RegulatoryRequirementsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/institutions/:id"
+                element={
+                  <ProtectedRoute>
+                    <InstitutionComplianceProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/assessments"
+                element={
+                  <ProtectedRoute>
+                    <ComplianceAssessmentWorkspacePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/assessments/:id"
+                element={
+                  <ProtectedRoute>
+                    <ComplianceAssessmentWorkspacePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/evidence"
+                element={
+                  <ProtectedRoute>
+                    <EvidenceReviewPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/caps"
+                element={
+                  <ProtectedRoute>
+                    <CorrectiveActionPlansPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/caps/:id"
+                element={
+                  <ProtectedRoute>
+                    <CorrectiveActionPlansPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/risk-intelligence"
+                element={
+                  <ProtectedRoute>
+                    <InstitutionalRiskIntelligencePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/sla-analytics"
+                element={
+                  <ProtectedRoute>
+                    <SlaAnalyticsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/executive"
+                element={
+                  <ProtectedRoute allowedRoles={['super_admin', 'bureau_head', 'monitoring_officer']}>
+                    <ExecutiveGovernancePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compliance/reports"
+                element={
+                  <ProtectedRoute>
+                    <GovernanceReportsPage />
                   </ProtectedRoute>
                 }
               />

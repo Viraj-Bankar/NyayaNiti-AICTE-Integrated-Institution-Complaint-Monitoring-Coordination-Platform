@@ -73,8 +73,8 @@ export const ComplaintDetailPage: React.FC = () => {
     e.preventDefault();
     if (!id || !suppFile) return;
 
-    if (suppFile.size > 5 * 1024 * 1024) {
-      setUploadMsg({ type: 'error', text: 'Document exceeds maximum permitted limit of 5 MB.' });
+    if (suppFile.size > 3 * 1024 * 1024) {
+      setUploadMsg({ type: 'error', text: 'Document exceeds maximum permitted limit of 3 MB.' });
       return;
     }
 
@@ -105,8 +105,8 @@ export const ComplaintDetailPage: React.FC = () => {
     try {
       let uploadedDocId: number | undefined;
       if (clarificationFile) {
-        if (clarificationFile.size > 5 * 1024 * 1024) {
-          throw new Error('Supporting document exceeds maximum permitted limit of 5 MB.');
+        if (clarificationFile.size > 3 * 1024 * 1024) {
+          throw new Error('Supporting document exceeds maximum permitted limit of 3 MB.');
         }
         const doc = await api.uploadComplainantDocument(id, clarificationFile, clarificationCategory);
         uploadedDocId = doc.id;
@@ -364,7 +364,7 @@ export const ComplaintDetailPage: React.FC = () => {
                         className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#092D62] file:text-white hover:file:bg-[#061E46] cursor-pointer bg-white p-1 rounded-xl border border-slate-300"
                       />
                       <span className="text-[10px] text-slate-500 block mt-1">
-                        PDF, PNG, JPG, JPEG, DOCX (Max 5 MB).
+                        PDF, PNG, JPG, JPEG, DOCX (Max 3 MB).
                       </span>
                     </div>
 
@@ -614,7 +614,7 @@ export const ComplaintDetailPage: React.FC = () => {
                       <span>{isUploading ? 'Uploading Evidence...' : 'Upload Supplementary Record'}</span>
                     </button>
                     <span className="text-[10px] text-slate-400 block text-center">
-                      Supported: PDF, PNG, JPG, JPEG, DOCX (Max 5 MB).
+                      Supported: PDF, PNG, JPG, JPEG, DOCX (Max 3 MB).
                     </span>
                   </form>
                 </div>

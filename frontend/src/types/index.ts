@@ -758,6 +758,312 @@ export interface AIModelStatus {
   statutory_safeguard: string;
 }
 
+// =========================================================================
+// Phase 8: Automated Institutional Compliance & Regulatory Analytics Types
+// =========================================================================
+
+export interface RegulatoryRequirementVersion {
+  id: number;
+  requirement_id: string;
+  version_number: number;
+  title: string;
+  description: string;
+  weight: number;
+  regulatory_source: string;
+  changes_summary: string;
+  promulgated_by_id?: number;
+  created_at: string;
+}
+
+export interface RegulatoryRequirement {
+  id: string; // e.g. "REQ-FAC-01"
+  title: string;
+  description: string;
+  category_code?: string;
+  regulatory_source: string;
+  source_reference_url?: string;
+  applicable_institution_types: string[];
+  applicability_conditions?: Record<string, any>;
+  weight: number;
+  default_evidence_requirements?: string[];
+  responsible_bureau_id: number;
+  responsible_bureau_code?: string;
+  effective_date: string;
+  review_date?: string;
+  version: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  versions?: RegulatoryRequirementVersion[];
+}
+
+export interface RegulatoryRequirementCreatePayload {
+  id: string;
+  title: string;
+  description: string;
+  category_code?: string;
+  regulatory_source: string;
+  source_reference_url?: string;
+  applicable_institution_types?: string[];
+  applicability_conditions?: Record<string, any>;
+  weight?: number;
+  default_evidence_requirements?: string[];
+  responsible_bureau_id: number;
+  effective_date?: string;
+  review_date?: string;
+}
+
+export interface RegulatoryRequirementUpdatePayload {
+  title?: string;
+  description?: string;
+  category_code?: string;
+  regulatory_source?: string;
+  source_reference_url?: string;
+  applicable_institution_types?: string[];
+  applicability_conditions?: Record<string, any>;
+  weight?: number;
+  default_evidence_requirements?: string[];
+  responsible_bureau_id?: number;
+  review_date?: string;
+  is_active?: boolean;
+  changes_summary?: string;
+}
+
+export interface ComplianceEvidence {
+  id: number;
+  assessment_id: number;
+  institution_id: number;
+  document_id: number;
+  document_name?: string;
+  file_type?: string;
+  evidence_type: string;
+  verification_status: 'SUBMITTED' | 'VERIFIED' | 'REJECTED' | 'PENDING' | 'CLARIFICATION_REQUESTED' | string;
+  verified_by_id?: number;
+  verified_by_name?: string;
+  verification_remarks?: string;
+  rejection_reason?: string;
+  submitted_by_role: string;
+  submitted_at: string;
+  verified_at?: string;
+}
+
+export interface ComplianceEvidenceCreatePayload {
+  document_id: number;
+  evidence_type: string;
+  remarks?: string;
+}
+
+export interface ComplianceEvidenceReviewPayload {
+  status?: 'VERIFIED' | 'REJECTED' | 'PENDING' | string;
+  verification_status?: 'VERIFIED' | 'REJECTED' | 'PENDING' | string;
+  verification_remarks: string;
+  rejection_reason?: string;
+}
+
+export interface ComplianceAssessment {
+  id: number;
+  institution_id: number;
+  institution_name?: string;
+  requirement_id: string;
+  requirement_title?: string;
+  requirement_weight: number;
+  requirement_version: number;
+  assessment_period: string;
+  status: 'NOT_ASSESSED' | 'PENDING_EVIDENCE' | 'UNDER_REVIEW' | 'COMPLIANT' | 'PARTIALLY_COMPLIANT' | 'NON_COMPLIANT' | 'NOT_APPLICABLE' | string;
+  score_contribution: number;
+  reviewer_id?: number;
+  reviewer_name?: string;
+  reviewer_remarks?: string;
+  assessed_at?: string;
+  decision_history?: Array<{
+    status: string;
+    score_awarded: number;
+    reviewer_id: number;
+    reviewer_name: string;
+    remarks: string;
+    timestamp: string;
+  }>;
+  created_at: string;
+  updated_at: string;
+  evidences?: ComplianceEvidence[];
+}
+
+export interface ComplianceAssessmentCreatePayload {
+  institution_id: number;
+  requirement_id: string;
+  assessment_period?: string;
+  status?: string;
+}
+
+export interface ComplianceAssessmentReviewPayload {
+  status: 'COMPLIANT' | 'PARTIALLY_COMPLIANT' | 'NON_COMPLIANT' | 'PENDING_EVIDENCE' | 'UNDER_REVIEW' | 'NOT_APPLICABLE' | string;
+  reviewer_remarks: string;
+  score_contribution?: number;
+}
+
+export interface CorrectiveActionPlan {
+  id: number;
+  institution_id: number;
+  institution_name?: string;
+  assessment_id?: number;
+  related_case_id?: string;
+  title: string;
+  identified_gap: string;
+  required_action: string;
+  responsible_bureau_id: number;
+  responsible_bureau_code?: string;
+  assigned_officer_id: number;
+  assigned_officer_name?: string;
+  priority: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+  status: 'DRAFT' | 'ISSUED' | 'IN_PROGRESS' | 'SUBMITTED' | 'UNDER_REVIEW' | 'VERIFIED' | 'CLOSED' | 'OVERDUE' | 'REJECTED_RESUBMISSION' | 'REOPENED' | string;
+  prescribed_deadline: string;
+  completion_evidence_doc_id?: number;
+  verification_officer_id?: number;
+  verification_officer_name?: string;
+  verification_remarks?: string;
+  closure_decision?: string;
+  closed_at?: string;
+  reopen_reason?: string;
+  is_overdue: boolean;
+  days_remaining?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CAPCreatePayload {
+  institution_id: number;
+  assessment_id?: number;
+  related_case_id?: string;
+  title: string;
+  identified_gap: string;
+  required_action: string;
+  responsible_bureau_id: number;
+  assigned_officer_id: number;
+  priority?: string;
+  prescribed_deadline: string;
+}
+
+export interface CAPUpdatePayload {
+  title?: string;
+  required_action?: string;
+  priority?: string;
+  status?: string;
+  remarks?: string;
+}
+
+export interface CAPEvidenceSubmitPayload {
+  completion_evidence_doc_id: number;
+  remarks: string;
+}
+
+export interface CAPVerifyPayload {
+  verification_remarks: string;
+  closure_decision: string;
+}
+
+export interface CAPReopenPayload {
+  reopen_reason: string;
+}
+
+export interface InstitutionalRiskIndicator {
+  id: number;
+  institution_id: number;
+  institution_name?: string;
+  indicator_type: string;
+  severity: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+  title: string;
+  supporting_evidence: Record<string, any>;
+  observation_period: string;
+  calculation_method: string;
+  data_completeness: number;
+  recommended_review: string;
+  status: string;
+  detected_at: string;
+  reviewed_by_id?: number;
+  reviewed_at?: string;
+}
+
+export interface InstitutionScorecard {
+  institution_id: number;
+  institution_name: string;
+  permanent_id: string;
+  region: string;
+  state: string;
+  assessment_period: string;
+  compliance_percentage: number;
+  assessment_coverage_pct: number;
+  is_provisional: boolean;
+  risk_tier: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+  total_applicable_requirements: number;
+  verified_compliant_count: number;
+  partially_compliant_count: number;
+  non_compliant_count: number;
+  unassessed_count: number;
+  pending_evidence_count: number;
+  not_applicable_count: number;
+  active_cap_count: number;
+  overdue_cap_count: number;
+  active_risk_indicator_count: number;
+  calculated_at: string;
+  formula_breakdown?: {
+    formula: string;
+    weights: Record<string, number>;
+    total_applicable: number;
+    assessed: number;
+    weighted_score_sum: number;
+    total_possible_weight: number;
+  };
+}
+
+export interface ExecutiveGovernanceSummary {
+  total_institutions_monitored: number;
+  active_regulatory_requirements: number;
+  national_average_compliance_pct: number;
+  national_average_coverage_pct: number;
+  institutions_high_or_critical_risk: number;
+  total_active_caps: number;
+  total_overdue_caps: number;
+  national_grievance_sla_adherence_pct: number;
+  regional_summaries: Array<{
+    region: string;
+    total_institutions: number;
+    avg_compliance: number;
+    avg_coverage: number;
+    open_caps: number;
+  }>;
+  top_deficiencies: Array<{
+    requirement_id: string;
+    title: string;
+    category: string;
+    non_compliant_count: number;
+  }>;
+  risk_distribution: {
+    Low: number;
+    Medium: number;
+    High: number;
+    Critical: number;
+  };
+  evaluated_at: string;
+}
+
+export interface GrievancePerformance {
+  total_complaints: number;
+  resolved_complaints: number;
+  pending_complaints: number;
+  overdue_complaints: number;
+  sla_adherence_pct: number;
+  disposal_rate_pct: number;
+  average_resolution_days: number;
+  overdue_rate_pct: number;
+  category_breakdown: Array<{
+    category: string;
+    total: number;
+    resolved: number;
+    sla_breached: number;
+  }>;
+  observation_period: string;
+}
+
 
 
 

@@ -239,10 +239,10 @@ def demo_complainant_login(db: Session = Depends(get_db)):
     Dedicated development quick-switch for evaluating the complainant portal.
     Strictly disabled in production environments.
     """
-    if os.getenv("APP_ENV", "development").lower() == "production":
+    if os.getenv("APP_ENV", "development").lower() in ("production", "staging"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Demo evaluation authentication is strictly disabled in production."
+            detail="Demo evaluation authentication is strictly disabled in production and staging environments. Citizens must authenticate via /api/complainant/login with registered credentials."
         )
 
     complainant = db.query(Complainant).filter(Complainant.email == "student.demo@nyayaniti.gov.in").first()

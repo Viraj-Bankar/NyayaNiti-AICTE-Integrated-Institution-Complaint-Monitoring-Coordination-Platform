@@ -25,6 +25,7 @@ from app.api.auth import get_current_user
 from app.services.audit_service import log_audit_event, record_case_event
 from app.api.cases import PERMITTED_STATUS_TRANSITIONS
 from app.api.documents import BASE_STORAGE_DIR
+from app.services import storage_service
 
 router = APIRouter(prefix="/officer/complaints", tags=["Officer Complaint Management"])
 
@@ -1211,27 +1212,11 @@ def download_complaint_document(
                 detail="Access restricted: Document is classified as Confidential - Bureau Head Only"
             )
 
-    # Resolve physical file path
-    abs_path = os.path.abspath(doc.file_path)
-    abs_base = os.path.abspath(BASE_STORAGE_DIR)
+    # Resolve document payload (database BYTEA or legacy filesystem)
+    payload = storage_service.retrieve_document_payload(doc, db)
 
-    # Path traversal protection
-    if not abs_path.startswith(abs_base):
-        raise HTTPException(status_code=400, detail="Invalid storage path detected")
+    if not payload:
+        raise HTTPException(status_code=404, detail="Document file missing from storage repository")
 
-    if not os.path.exists(abs_path) or not os.path.isfile(abs_path):
-        raise HTTPException(status_code=404, detail="Physical document file missing from storage repository")
-
-    content_type, _ = mimetypes.guess_type(abs_path)
-    if not content_type:
-        content_type = "application/octet-stream"
-
-    filename = doc.original_filename or doc.file_name or os.path.basename(abs_path)
-
-    return FileResponse(
-        path=abs_path,
-        media_type=content_type,
-        filename=filename,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+    return storage_service.create_download_response(payload)
 

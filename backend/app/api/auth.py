@@ -166,10 +166,10 @@ def demo_login(role: str, db: Session = Depends(get_db)):
     Allowed roles: 'super_admin', 'authorized_officer', 'bureau_head', 'monitoring_officer'
     Strictly disabled in production environments to prevent privilege escalation and unauthorized admin access.
     """
-    if os.getenv("APP_ENV", "development").lower() == "production":
+    if os.getenv("APP_ENV", "development").lower() in ("production", "staging"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Demo evaluation authentication is strictly disabled in production. Official officers must authenticate via /api/auth/login with assigned credentials."
+            detail="Demo evaluation authentication is strictly disabled in production and staging environments. Official officers must authenticate via /api/auth/login with assigned credentials."
         )
 
     valid_roles = ["super_admin", "authorized_officer", "bureau_head", "monitoring_officer"]

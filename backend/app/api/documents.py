@@ -9,14 +9,12 @@ from app.models.models import DocumentMetadata, Case, User, Complainant
 from app.schemas.schemas import DocumentMetadataResponse
 from app.api.auth import get_current_user
 from app.services.audit_service import log_audit_event, record_case_event
+from app.services import storage_service
 
 router = APIRouter(prefix="/documents", tags=["Document & Evidence Management"])
 
-DEFAULT_STORAGE_DIR = os.path.abspath(os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "storage", "cases"
-))
-BASE_STORAGE_DIR = os.path.abspath(os.environ.get("STORAGE_DIR", DEFAULT_STORAGE_DIR))
+# Backward compatibility alias for test imports
+BASE_STORAGE_DIR = storage_service.get_storage_root()
 
 MIME_TYPES = {
     "pdf": "application/pdf",
@@ -76,7 +74,8 @@ def download_document(
 ):
     """
     Allow authenticated officers to stream and download evidence and notice attachments.
-    Enforces confidential document classification controls.
+    Enforces confidential document classification controls and supports both database
+    BYTEA binaries and legacy filesystem documents.
     """
     doc = db.query(DocumentMetadata).filter(DocumentMetadata.id == document_id).first()
     if not doc:
@@ -92,26 +91,14 @@ def download_document(
             detail="Access denied: Document classified as 'Confidential - Bureau Head Only'."
         )
 
-    # Resolve candidate file path
-    target_path = None
-    if doc.file_path and os.path.isabs(doc.file_path) and os.path.exists(doc.file_path):
-        target_path = doc.file_path
-    else:
-        # Check in BASE_STORAGE_DIR / {case_id} / {file_name}
-        candidate_storage = os.path.join(BASE_STORAGE_DIR, doc.case_id, doc.file_name)
-        if os.path.exists(candidate_storage):
-            target_path = candidate_storage
-        elif doc.file_path and os.path.exists(os.path.join(BASE_STORAGE_DIR, os.path.basename(doc.file_path))):
-            target_path = os.path.join(BASE_STORAGE_DIR, os.path.basename(doc.file_path))
-
-    if not target_path or not os.path.exists(target_path):
+    # Resolve document payload (database BYTEA or legacy filesystem)
+    payload = storage_service.retrieve_document_payload(doc, db)
+    if not payload:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Physical file for '{doc.original_filename or doc.file_name}' not found on storage server."
+            detail=f"Physical or database binary file for '{doc.original_filename or doc.file_name}' not found."
         )
 
-    ext = doc.file_type.lower()
-    media_type = MIME_TYPES.get(ext, "application/octet-stream")
     download_filename = doc.original_filename or doc.file_name
 
     log_audit_event(
@@ -125,43 +112,77 @@ def download_document(
         remarks=f"Officer {current_user.full_name} downloaded document '{download_filename}' for case {doc.case_id}"
     )
 
-    return FileResponse(
-        path=target_path,
-        media_type=media_type,
-        filename=download_filename
-    )
+    return storage_service.create_download_response(payload)
+
+@router.get("/admin/diagnostics")
+def get_document_storage_diagnostics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Administrative observability and quota diagnostics.
+    Reports byte counts, averages, and quota utilization without loading document contents.
+    """
+    if current_user.role not in ["super_admin", "bureau_head"]:
+        raise HTTPException(status_code=403, detail="Access denied: Admin role required.")
+    return storage_service.get_storage_diagnostics(db)
 
 @router.post("/case/{case_id}", response_model=DocumentMetadataResponse)
-def upload_case_document(
+async def upload_case_document(
     case_id: str,
     file_name: str = Form(...),
     category: str = Form("Official Notice"),
     access_classification: str = Form("Official Internal"),
     file_size: int = Form(102400),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     c = db.query(Case).filter(Case.id == case_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Case record not found")
-        
-    # File type validation
-    ext = file_name.split(".")[-1].lower() if "." in file_name else "pdf"
-    
-    doc = DocumentMetadata(
-        case_id=c.id,
-        file_name=file_name,
-        file_size=file_size,
-        file_type=ext,
-        category=category,
-        access_classification=access_classification,
-        uploaded_by_id=current_user.id,
-        file_path=f"/secure/storage/cases/{c.id}/{file_name}",
-        upload_timestamp=datetime.utcnow()
-    )
-    db.add(doc)
-    db.commit()
-    db.refresh(doc)
+
+    if file:
+        try:
+            file_bytes = await storage_service.read_upload_stream(file)
+            doc = storage_service.store_uploaded_document(
+                db=db,
+                case_id=c.id,
+                file_data=file_bytes,
+                original_filename=file.filename or file_name,
+                category=category,
+                access_classification=access_classification,
+                uploaded_by_id=current_user.id,
+                uploaded_by_complainant_id=None,
+                uploader_role="officer",
+                content_type=file.content_type
+            )
+        except ValueError as ve:
+            if "exceeds maximum permitted limit" in str(ve).lower():
+                raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(ve))
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    else:
+        # Form-only metadata record (legacy/seed compatibility)
+        doc = DocumentMetadata(
+            case_id=c.id,
+            file_name=file_name,
+            original_filename=file_name,
+            file_size=file_size,
+            file_type=file_name.split(".")[-1].lower() if "." in file_name else "pdf",
+            category=category,
+            access_classification=access_classification,
+            uploaded_by_id=current_user.id,
+            file_path=f"/secure/storage/cases/{c.id}/{file_name}",
+            upload_timestamp=datetime.utcnow()
+        )
+        db.add(doc)
+
+    try:
+        db.commit()
+        db.refresh(doc)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database transaction failed during document upload.")
     
     record_case_event(
         db=db,
@@ -188,6 +209,7 @@ def upload_case_document(
         "id": doc.id,
         "case_id": doc.case_id,
         "file_name": doc.file_name,
+        "original_filename": doc.original_filename or doc.file_name,
         "file_size": doc.file_size,
         "file_type": doc.file_type,
         "category": doc.category,

@@ -36,6 +36,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def ensure_schema():
+    if not settings.AUTO_MIGRATE:
+        return
     import app.models.models  # noqa: F401 - ensure all declarative models are registered on Base
     Base.metadata.create_all(bind=engine)
     try:
@@ -126,6 +128,17 @@ def ensure_schema():
                 conflict_cols = [c["name"] for c in inspector.get_columns("action_conflict_alerts")]
                 if "coordination_workspace_id" not in conflict_cols:
                     conn.execute(text("ALTER TABLE action_conflict_alerts ADD COLUMN coordination_workspace_id INTEGER REFERENCES coordination_workspaces(id)"))
+
+            # 7. Phase 8: Compliance & Governance Table Verification
+            # Safe creation of indexes for fast multi-dimensional lookups
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comp_assess_inst_req_period ON compliance_assessments (institution_id, requirement_id, assessment_period);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_cap_inst_status_deadline ON corrective_action_plans (institution_id, status, prescribed_deadline);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_risk_ind_inst_severity ON institutional_risk_indicators (institution_id, severity, status);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comp_snap_inst_period ON compliance_score_snapshots (institution_id, assessment_period);"))
+
+            # 8. Zero-Cost Document Binaries Table Verification (PostgreSQL BYTEA / SQLite LargeBinary)
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_document_binaries_document_id ON document_binaries (document_id);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_document_binaries_created_at ON document_binaries (created_at);"))
 
             conn.commit()
     except Exception as e:
