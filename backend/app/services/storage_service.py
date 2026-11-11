@@ -186,9 +186,10 @@ def validate_storage(root_override: Optional[str] = None) -> Dict[str, Any]:
 def validate_storage_on_startup() -> Dict[str, Any]:
     """
     Startup hook for FastAPI.
-    Validates persistent storage health and fails fast in production if:
-    1. DOCUMENT_STORAGE_BACKEND is unsupported.
-    2. In 'neon_bytea' / 'database' mode, verifies database connectivity without requiring disk.
+    Validates storage health:
+    1. DOCUMENT_STORAGE_BACKEND is unsupported -> raises ValueError.
+    2. In 'neon_bytea' / 'database' mode, verifies database connectivity AND checks that
+       the required 'document_binaries' table actually exists; fails explicitly if missing.
     3. In 'render_disk' mode, verifies DOCUMENT_STORAGE_ROOT is an absolute path.
     4. In filesystem mode, verifies storage root exists and has write permissions.
     """
@@ -197,10 +198,19 @@ def validate_storage_on_startup() -> Dict[str, Any]:
     # Zero-Cost PostgreSQL BYTEA / Database Storage Mode
     if backend in {"neon_bytea", "database"}:
         from app.database import engine
-        from sqlalchemy import text
+        from sqlalchemy import text, inspect
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
+                inspector = inspect(conn)
+                tables = inspector.get_table_names()
+                if "document_binaries" not in tables:
+                    raise RuntimeError(
+                        f"DATABASE STORAGE CONFIG ERROR: DOCUMENT_STORAGE_BACKEND is configured as "
+                        f"'{backend}', but the required table 'document_binaries' does not exist in the database. "
+                        "To use database BYTEA storage, execute the migration to create 'document_binaries'. "
+                        "Otherwise, configure DOCUMENT_STORAGE_BACKEND=filesystem."
+                    )
             return {
                 "status": "ready",
                 "backend": backend,
@@ -208,9 +218,9 @@ def validate_storage_on_startup() -> Dict[str, Any]:
                 "writable": True
             }
         except Exception as e:
-            err_msg = f"Zero-cost database storage connection failed: {e}"
-            if os.getenv("APP_ENV", "development").lower() in ("production", "staging"):
-                raise RuntimeError(f"{os.getenv('APP_ENV').upper()} STORAGE ERROR: {err_msg}")
+            err_msg = f"Zero-cost database storage check failed: {e}"
+            if os.getenv("APP_ENV", "development").lower() in ("production", "staging") or os.getenv("RENDER") == "true":
+                raise RuntimeError(f"STORAGE CONFIGURATION ERROR: {err_msg}")
             else:
                 print(f"[NyayaNiti Storage Warning] {err_msg}")
             return {
@@ -220,23 +230,27 @@ def validate_storage_on_startup() -> Dict[str, Any]:
                 "error": str(e)
             }
 
-    is_prod = (
-        os.getenv("APP_ENV", "development").lower() == "production"
-        or settings.DOCUMENT_STORAGE_ROOT == "/storage/docs"
-        or os.getenv("RENDER") == "true"
-        or backend == "render_disk"
-    )
-
-    if is_prod and not os.path.isabs(settings.DOCUMENT_STORAGE_ROOT):
+    # Filesystem / Persistent Disk Storage Mode
+    if backend == "render_disk" and not os.path.isabs(settings.DOCUMENT_STORAGE_ROOT):
         raise RuntimeError(
             f"PRODUCTION STORAGE CONFIG ERROR: DOCUMENT_STORAGE_ROOT is set to relative path "
-            f"'{settings.DOCUMENT_STORAGE_ROOT}'. Production requires a mounted persistent disk path (e.g. /storage/docs)."
+            f"'{settings.DOCUMENT_STORAGE_ROOT}'. render_disk requires a mounted persistent disk path (e.g. /storage/docs)."
+        )
+
+    if os.getenv("RENDER") == "true" and backend in {"filesystem", "local"}:
+        print(
+            "[NyayaNiti Storage Notice] DOCUMENT_STORAGE_BACKEND is running on Render with local/filesystem storage. "
+            "Note: Storage is ephemeral without a mounted Render Persistent Disk."
         )
 
     result = validate_storage()
 
     if result["status"] != "ready":
         err_msg = f"Storage initialization failed for '{result['path']}': {result.get('error')}"
+        is_prod = (
+            os.getenv("APP_ENV", "development").lower() == "production"
+            or os.getenv("RENDER") == "true"
+        )
         if is_prod:
             raise RuntimeError(f"PRODUCTION STORAGE ERROR: {err_msg}")
         else:
@@ -697,9 +711,18 @@ def store_uploaded_document(
     clean_name, ext, file_size = validate_file_upload(file_data, original_filename, content_type)
     backend = (backend_override or settings.DOCUMENT_STORAGE_BACKEND).strip().lower()
 
-    from app.models.models import DocumentMetadata, DocumentBinary
+    from app.models.models import DocumentMetadata
 
     if backend in {"neon_bytea", "database"}:
+        from sqlalchemy import inspect
+        inspector = inspect(db.get_bind())
+        if "document_binaries" not in inspector.get_table_names():
+            raise RuntimeError(
+                f"DOCUMENT_STORAGE_BACKEND is configured as '{backend}', but the table 'document_binaries' "
+                "does not exist in the database. Restore the table via migration or set DOCUMENT_STORAGE_BACKEND=filesystem."
+            )
+
+        from app.models.models import DocumentBinary
         checksum = compute_sha256(file_data)
 
         # Step 1: Create DocumentMetadata record
@@ -763,24 +786,33 @@ def store_uploaded_document(
 def get_document_binary(doc: Any, db: Any) -> Optional[Tuple[bytes, str, str, int]]:
     """
     Retrieve document binary bytes.
-    First checks the DocumentBinary table in the database.
-    If not in the database, falls back to legacy filesystem resolution.
+    When database storage is configured, retrieves from DocumentBinary table.
+    When filesystem storage is configured, retrieves from filesystem without querying DocumentBinary.
     Returns: (binary_bytes, filename, file_type, file_size) or None
     """
     if not doc:
         return None
 
-    from app.models.models import DocumentBinary
+    backend = settings.DOCUMENT_STORAGE_BACKEND.strip().lower()
 
-    # 1. Check DocumentBinary in database
-    if hasattr(doc, "id") and doc.id is not None:
-        bin_record = db.query(DocumentBinary).filter(DocumentBinary.document_id == doc.id).first()
-        if bin_record and bin_record.content:
-            filename = getattr(doc, "original_filename", None) or getattr(doc, "file_name", "document")
-            file_type = getattr(doc, "file_type", "pdf")
-            return (bin_record.content, filename, file_type, bin_record.file_size_bytes)
+    if backend in {"neon_bytea", "database"}:
+        from sqlalchemy import inspect
+        inspector = inspect(db.get_bind())
+        if "document_binaries" not in inspector.get_table_names():
+            raise RuntimeError(
+                f"DOCUMENT_STORAGE_BACKEND is configured as '{backend}', but the table 'document_binaries' "
+                "does not exist in the database. Restore the table via migration or set DOCUMENT_STORAGE_BACKEND=filesystem."
+            )
+        from app.models.models import DocumentBinary
+        if hasattr(doc, "id") and doc.id is not None:
+            bin_record = db.query(DocumentBinary).filter(DocumentBinary.document_id == doc.id).first()
+            if bin_record and bin_record.content:
+                filename = getattr(doc, "original_filename", None) or getattr(doc, "file_name", "document")
+                file_type = getattr(doc, "file_type", "pdf")
+                return (bin_record.content, filename, file_type, bin_record.file_size_bytes)
+        return None
 
-    # 2. Check legacy filesystem resolution
+    # Filesystem resolution: never queries DocumentBinary
     file_path = resolve_document_file_path(doc)
     if file_path and os.path.isfile(file_path):
         try:
@@ -802,26 +834,37 @@ def retrieve_document_payload(
     """
     Unified payload retriever.
     Returns: (binary_bytes, physical_path, filename, media_type, file_size)
-    - For database-stored binaries: (bytes, None, filename, media_type, size)
-    - For legacy filesystem files: (None, path, filename, media_type, size)
+    - When DOCUMENT_STORAGE_BACKEND is neon_bytea/database: queries DocumentBinary and returns (bytes, None, ...).
+      Fails explicitly with RuntimeError if the 'document_binaries' table is missing.
+    - When DOCUMENT_STORAGE_BACKEND is filesystem/local/render_disk: resolves from filesystem and returns (None, path, ...).
+      Does NOT query DocumentBinary.
     - For missing files: None
     """
     if not doc:
         return None
 
-    from app.models.models import DocumentBinary
-
     filename = getattr(doc, "original_filename", None) or getattr(doc, "file_name", "document.pdf")
     ext = getattr(doc, "file_type", "pdf").lower().lstrip(".")
     media_type = ALLOWED_MIME_TYPES.get(ext, ["application/octet-stream"])[0]
 
-    # 1. Database-backed binary check
-    if hasattr(doc, "id") and doc.id is not None:
-        bin_record = db.query(DocumentBinary).filter(DocumentBinary.document_id == doc.id).first()
-        if bin_record and bin_record.content:
-            return (bin_record.content, None, filename, media_type, bin_record.file_size_bytes)
+    backend = settings.DOCUMENT_STORAGE_BACKEND.strip().lower()
 
-    # 2. Legacy filesystem resolution check
+    if backend in {"neon_bytea", "database"}:
+        from sqlalchemy import inspect
+        inspector = inspect(db.get_bind())
+        if "document_binaries" not in inspector.get_table_names():
+            raise RuntimeError(
+                f"DOCUMENT_STORAGE_BACKEND is configured as '{backend}', but the table 'document_binaries' "
+                "does not exist in the database. Restore the table via migration or set DOCUMENT_STORAGE_BACKEND=filesystem."
+            )
+        from app.models.models import DocumentBinary
+        if hasattr(doc, "id") and doc.id is not None:
+            bin_record = db.query(DocumentBinary).filter(DocumentBinary.document_id == doc.id).first()
+            if bin_record and bin_record.content:
+                return (bin_record.content, None, filename, media_type, bin_record.file_size_bytes)
+        return None
+
+    # Filesystem resolution: never queries DocumentBinary
     file_path = resolve_document_file_path(doc)
     if file_path and os.path.isfile(file_path):
         return (None, file_path, filename, media_type, os.path.getsize(file_path))
@@ -878,10 +921,11 @@ def delete_document_safely(
     Enforce evidence retention and legal-hold integrity during document deletion.
     - Prohibits deletion if referenced in ComplianceEvidence, CorrectiveActionPlan, or CoordinationTask.
     - Prohibits deletion unless actor is super_admin or force is True.
-    - Deletes DocumentBinary and DocumentMetadata atomically within the transaction.
+    - Deletes DocumentBinary (if backend is database or doc is db:// and table exists) and DocumentMetadata atomically.
+    - Deletes filesystem file if applicable.
     """
     from app.models.models import (
-        DocumentMetadata, DocumentBinary, ComplianceEvidence,
+        DocumentMetadata, ComplianceEvidence,
         CorrectiveActionPlan, CoordinationTask
     )
 
@@ -908,8 +952,13 @@ def delete_document_safely(
     if actor_role != "super_admin" and not force:
         return False
 
-    # Delete DocumentBinary first (due to ondelete="RESTRICT")
-    db.query(DocumentBinary).filter(DocumentBinary.document_id == doc_id).delete()
+    backend = settings.DOCUMENT_STORAGE_BACKEND.strip().lower()
+    if backend in {"neon_bytea", "database"} or (doc.file_path and doc.file_path.startswith("db://")):
+        from sqlalchemy import inspect
+        inspector = inspect(db.get_bind())
+        if "document_binaries" in inspector.get_table_names():
+            from app.models.models import DocumentBinary
+            db.query(DocumentBinary).filter(DocumentBinary.document_id == doc_id).delete()
 
     # Delete DocumentMetadata
     db.delete(doc)
@@ -923,73 +972,125 @@ def delete_document_safely(
 
 def get_storage_diagnostics(db: Any) -> Dict[str, Any]:
     """
-    Administrative diagnostic function to report storage usage and quota without
-    loading full document binaries into memory.
-    Uses efficient SQL aggregate queries.
+    Administrative diagnostic function to report storage usage and quota.
+    When DOCUMENT_STORAGE_BACKEND is neon_bytea/database:
+      - Validates that document_binaries table exists; fails explicitly if missing.
+      - Uses efficient SQL aggregate queries on DocumentBinary.
+    When DOCUMENT_STORAGE_BACKEND is filesystem/local/render_disk:
+      - Does NOT query DocumentBinary.
+      - Traverses the storage root to report file counts, sizes, and disk metrics.
     """
-    from app.models.models import DocumentMetadata, DocumentBinary
+    from app.models.models import DocumentMetadata
     from sqlalchemy import func
 
+    backend = settings.DOCUMENT_STORAGE_BACKEND.strip().lower()
+
+    if backend in {"neon_bytea", "database"}:
+        from sqlalchemy import inspect
+        inspector = inspect(db.get_bind())
+        if "document_binaries" not in inspector.get_table_names():
+            raise RuntimeError(
+                f"DOCUMENT_STORAGE_BACKEND is configured as '{backend}', but the table 'document_binaries' "
+                "does not exist in the database. Restore the table via migration or set DOCUMENT_STORAGE_BACKEND=filesystem."
+            )
+        from app.models.models import DocumentBinary
+
+        total_meta = db.query(func.count(DocumentMetadata.id)).scalar() or 0
+        total_bin = db.query(func.count(DocumentBinary.id)).scalar() or 0
+        total_bytes = db.query(func.sum(DocumentBinary.file_size_bytes)).scalar() or 0
+        avg_bytes = db.query(func.avg(DocumentBinary.file_size_bytes)).scalar() or 0.0
+        max_bytes = db.query(func.max(DocumentBinary.file_size_bytes)).scalar() or 0
+
+        db_backed_count = db.query(func.count(DocumentMetadata.id)).filter(
+            DocumentMetadata.file_path.like("db://%")
+        ).scalar() or 0
+
+        legacy_fs_count = total_meta - db_backed_count
+
+        missing_binaries = db.query(func.count(DocumentMetadata.id)).filter(
+            DocumentMetadata.file_path.like("db://%"),
+            ~DocumentMetadata.id.in_(db.query(DocumentBinary.document_id))
+        ).scalar() or 0
+
+        orphan_binaries = db.query(func.count(DocumentBinary.id)).filter(
+            ~DocumentBinary.document_id.in_(db.query(DocumentMetadata.id))
+        ).scalar() or 0
+
+        metadata_without_binary = total_meta - total_bin
+
+        assumed_quota_mb = getattr(settings, "DOCUMENT_STORAGE_ASSUMED_QUOTA_MB", 512)
+        assumed_quota_bytes = assumed_quota_mb * 1024 * 1024
+        utilization_pct = round((total_bytes / assumed_quota_bytes) * 100, 4) if assumed_quota_bytes > 0 else 0.0
+
+        is_intact = (missing_binaries == 0 and orphan_binaries == 0)
+        operational_status = "operational" if is_intact else "degraded"
+
+        return {
+            "backend": settings.DOCUMENT_STORAGE_BACKEND,
+            "max_file_size_mb": settings.DOCUMENT_STORAGE_MAX_FILE_SIZE_MB,
+            "total_metadata_records": int(total_meta),
+            "total_binary_records": int(total_bin),
+            "total_stored_binary_bytes": int(total_bytes),
+            "total_stored_binary_mb": round(total_bytes / (1024 * 1024), 2),
+            "average_document_size_bytes": round(avg_bytes, 2),
+            "max_document_size_bytes": int(max_bytes),
+            "database_backed_documents": int(db_backed_count),
+            "legacy_filesystem_documents": int(legacy_fs_count),
+            "missing_binary_records": int(missing_binaries),
+            "orphan_binary_records": int(orphan_binaries),
+            "metadata_without_binary": int(metadata_without_binary),
+            "configured_quota_mb": assumed_quota_mb,
+            "neon_free_quota_mb": assumed_quota_mb,
+            "quota_status": "unverified_estimate",
+            "is_quota_verified": False,
+            "quota_utilization_percent": utilization_pct,
+            "operational_status": operational_status,
+            "integrity_status": "intact" if is_intact else "violation",
+            "status": "healthy" if is_intact else "warning",
+            "diagnostics_advisory": (
+                "Operational health is derived from database schema and referential integrity. "
+                "Quota utilization is an advisory estimate based on configured threshold."
+            ),
+        }
+
+    # Filesystem / Local Storage Diagnostics (zero queries to DocumentBinary)
     total_meta = db.query(func.count(DocumentMetadata.id)).scalar() or 0
-    total_bin = db.query(func.count(DocumentBinary.id)).scalar() or 0
-    total_bytes = db.query(func.sum(DocumentBinary.file_size_bytes)).scalar() or 0
-    avg_bytes = db.query(func.avg(DocumentBinary.file_size_bytes)).scalar() or 0.0
-    max_bytes = db.query(func.max(DocumentBinary.file_size_bytes)).scalar() or 0
+    storage_root = get_storage_root()
+    total_fs_files = 0
+    total_fs_bytes = 0
+    max_fs_bytes = 0
 
-    db_backed_count = db.query(func.count(DocumentMetadata.id)).filter(
-        DocumentMetadata.file_path.like("db://%")
-    ).scalar() or 0
+    if os.path.exists(storage_root) and os.path.isdir(storage_root):
+        for root_dir, _, filenames in os.walk(storage_root):
+            for fn in filenames:
+                if fn.startswith("."):
+                    continue
+                fp = os.path.join(root_dir, fn)
+                try:
+                    sz = os.path.getsize(fp)
+                    total_fs_files += 1
+                    total_fs_bytes += sz
+                    if sz > max_fs_bytes:
+                        max_fs_bytes = sz
+                except OSError:
+                    pass
 
-    legacy_fs_count = total_meta - db_backed_count
-
-    # Integrity verification: Identify missing binaries and orphan binaries
-    missing_binaries = db.query(func.count(DocumentMetadata.id)).filter(
-        DocumentMetadata.file_path.like("db://%"),
-        ~DocumentMetadata.id.in_(db.query(DocumentBinary.document_id))
-    ).scalar() or 0
-
-    orphan_binaries = db.query(func.count(DocumentBinary.id)).filter(
-        ~DocumentBinary.document_id.in_(db.query(DocumentMetadata.id))
-    ).scalar() or 0
-
-    metadata_without_binary = total_meta - total_bin
-
-    assumed_quota_mb = getattr(settings, "DOCUMENT_STORAGE_ASSUMED_QUOTA_MB", 512)
-    assumed_quota_bytes = assumed_quota_mb * 1024 * 1024
-    utilization_pct = round((total_bytes / assumed_quota_bytes) * 100, 4) if assumed_quota_bytes > 0 else 0.0
-
-    # Operational status is determined strictly by data integrity and connectivity,
-    # never solely by an unverified third-party account quota assumption.
-    is_intact = (missing_binaries == 0 and orphan_binaries == 0)
-    operational_status = "operational" if is_intact else "degraded"
+    avg_fs_bytes = round(total_fs_bytes / total_fs_files, 2) if total_fs_files > 0 else 0.0
 
     return {
         "backend": settings.DOCUMENT_STORAGE_BACKEND,
+        "storage_root": storage_root,
         "max_file_size_mb": settings.DOCUMENT_STORAGE_MAX_FILE_SIZE_MB,
-        # Verified measured database metrics
         "total_metadata_records": int(total_meta),
-        "total_binary_records": int(total_bin),
-        "total_stored_binary_bytes": int(total_bytes),
-        "total_stored_binary_mb": round(total_bytes / (1024 * 1024), 2),
-        "average_document_size_bytes": round(avg_bytes, 2),
-        "max_document_size_bytes": int(max_bytes),
-        "database_backed_documents": int(db_backed_count),
-        "legacy_filesystem_documents": int(legacy_fs_count),
-        "missing_binary_records": int(missing_binaries),
-        "orphan_binary_records": int(orphan_binaries),
-        "metadata_without_binary": int(metadata_without_binary),
-        # Configured / unverified quota threshold metrics
-        "configured_quota_mb": assumed_quota_mb,
-        "neon_free_quota_mb": assumed_quota_mb,  # Backward compatibility for existing telemetry
-        "quota_status": "unverified_estimate",
-        "is_quota_verified": False,
-        "quota_utilization_percent": utilization_pct,
-        # Operational and integrity health
-        "operational_status": operational_status,
-        "integrity_status": "intact" if is_intact else "violation",
-        "status": "healthy" if is_intact else "warning",
+        "total_stored_files": int(total_fs_files),
+        "total_stored_bytes": int(total_fs_bytes),
+        "total_stored_mb": round(total_fs_bytes / (1024 * 1024), 2),
+        "average_document_size_bytes": avg_fs_bytes,
+        "max_document_size_bytes": int(max_fs_bytes),
+        "operational_status": "operational",
+        "integrity_status": "intact",
+        "status": "healthy",
         "diagnostics_advisory": (
-            "Operational health is derived from database schema and referential integrity. "
-            "Quota utilization is an advisory estimate based on configured threshold."
+            "Filesystem storage backend is active. Document payloads are stored on the local or persistent filesystem root."
         ),
     }

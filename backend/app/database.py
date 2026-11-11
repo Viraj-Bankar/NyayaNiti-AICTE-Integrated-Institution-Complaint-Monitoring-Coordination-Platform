@@ -39,7 +39,12 @@ def ensure_schema():
     if not settings.AUTO_MIGRATE:
         return
     import app.models.models  # noqa: F401 - ensure all declarative models are registered on Base
-    Base.metadata.create_all(bind=engine)
+    # Guard: never automatically recreate the removed document_binaries table during auto-migration
+    tables_to_create = [
+        t for name, t in Base.metadata.tables.items()
+        if name != "document_binaries"
+    ]
+    Base.metadata.create_all(bind=engine, tables=tables_to_create)
     try:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
@@ -136,9 +141,10 @@ def ensure_schema():
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_risk_ind_inst_severity ON institutional_risk_indicators (institution_id, severity, status);"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comp_snap_inst_period ON compliance_score_snapshots (institution_id, assessment_period);"))
 
-            # 8. Zero-Cost Document Binaries Table Verification (PostgreSQL BYTEA / SQLite LargeBinary)
-            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_document_binaries_document_id ON document_binaries (document_id);"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_document_binaries_created_at ON document_binaries (created_at);"))
+            # 8. Document Binaries Table Verification (only create indexes if table exists)
+            if "document_binaries" in tables:
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_document_binaries_document_id ON document_binaries (document_id);"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_document_binaries_created_at ON document_binaries (created_at);"))
 
             conn.commit()
     except Exception as e:

@@ -92,7 +92,13 @@ def download_document(
         )
 
     # Resolve document payload (database BYTEA or legacy filesystem)
-    payload = storage_service.retrieve_document_payload(doc, db)
+    try:
+        payload = storage_service.retrieve_document_payload(doc, db)
+    except RuntimeError as err:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(err)
+        )
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -125,7 +131,10 @@ def get_document_storage_diagnostics(
     """
     if current_user.role not in ["super_admin", "bureau_head"]:
         raise HTTPException(status_code=403, detail="Access denied: Admin role required.")
-    return storage_service.get_storage_diagnostics(db)
+    try:
+        return storage_service.get_storage_diagnostics(db)
+    except RuntimeError as err:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(err))
 
 @router.post("/case/{case_id}", response_model=DocumentMetadataResponse)
 async def upload_case_document(
@@ -161,6 +170,8 @@ async def upload_case_document(
             if "exceeds maximum permitted limit" in str(ve).lower():
                 raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(ve))
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+        except RuntimeError as err:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(err))
     else:
         # Form-only metadata record (legacy/seed compatibility)
         doc = DocumentMetadata(

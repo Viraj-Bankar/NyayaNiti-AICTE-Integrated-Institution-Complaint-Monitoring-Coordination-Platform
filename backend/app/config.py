@@ -40,8 +40,8 @@ class Settings(BaseSettings):
     SLA_MEDIUM_DAYS: int = 30
     SLA_LOW_DAYS: int = 45
 
-    # Document & Evidence Storage Configuration (Zero-Cost Neon PostgreSQL BYTEA Compatible)
-    DOCUMENT_STORAGE_BACKEND: str = "neon_bytea"
+    # Document & Evidence Storage Configuration (Filesystem / Persistent Disk Storage)
+    DOCUMENT_STORAGE_BACKEND: str = "filesystem"
     DOCUMENT_STORAGE_ROOT: str = "./storage/docs"
     DOCUMENT_STORAGE_MAX_FILE_SIZE_MB: int = 3
     DOCUMENT_STORAGE_ALLOWED_EXTENSIONS: List[str] = [

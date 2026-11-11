@@ -1213,7 +1213,10 @@ def download_complaint_document(
             )
 
     # Resolve document payload (database BYTEA or legacy filesystem)
-    payload = storage_service.retrieve_document_payload(doc, db)
+    try:
+        payload = storage_service.retrieve_document_payload(doc, db)
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
 
     if not payload:
         raise HTTPException(status_code=404, detail="Document file missing from storage repository")

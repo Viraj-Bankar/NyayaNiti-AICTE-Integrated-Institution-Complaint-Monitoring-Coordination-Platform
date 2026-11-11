@@ -62,7 +62,7 @@ def get_citizen_auth_headers(prefix: str = "storage_cit") -> dict:
 # -----------------------------------------------------------------------------
 def test_1_default_local_configuration():
     """Verify default local storage configuration settings."""
-    assert settings.DOCUMENT_STORAGE_BACKEND in ["local", "neon_bytea"]
+    assert settings.DOCUMENT_STORAGE_BACKEND in ["local", "filesystem", "neon_bytea"]
     assert settings.DOCUMENT_STORAGE_ROOT in ["./storage/docs", "/storage/docs"]
     assert settings.DOCUMENT_STORAGE_MAX_FILE_SIZE_MB in [3, 15]
     assert ".pdf" in settings.DOCUMENT_STORAGE_ALLOWED_EXTENSIONS

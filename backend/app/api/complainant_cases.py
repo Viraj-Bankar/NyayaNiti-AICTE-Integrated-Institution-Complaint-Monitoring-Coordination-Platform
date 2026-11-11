@@ -669,6 +669,11 @@ async def _upload_complainant_document(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(ve)
         )
+    except RuntimeError as err:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(err)
+        )
 
     # 3. Comprehensive upload validation and unified transactional storage (BYTEA or Filesystem)
     try:
@@ -693,6 +698,11 @@ async def _upload_complainant_document(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(ve)
+        )
+    except RuntimeError as err:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(err)
         )
 
     try:
@@ -829,7 +839,10 @@ def download_complaint_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Requested document not found or access unauthorized.")
 
-    payload = storage_service.retrieve_document_payload(doc, db)
+    try:
+        payload = storage_service.retrieve_document_payload(doc, db)
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err))
 
     if not payload:
         raise HTTPException(status_code=404, detail="Stored document file could not be retrieved.")
